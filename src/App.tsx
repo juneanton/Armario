@@ -17,18 +17,11 @@ import {
   Star, 
   RefreshCw, 
   Download, 
-  HardDrive, 
-  Info,
-  Calendar,
-  X,
   MapPin,
-  Tag,
-  Palette,
-  Layers
+  X
 } from 'lucide-react';
 import { Prenda, Look, Uso, getPrendas, savePrenda, deletePrenda, getLooks, saveLook, deleteLook, getUsos, registrarUso, clearAllData } from './db';
 
-// Utils
 const compressImage = (file: File): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -90,7 +83,6 @@ const base64ToBlob = (base64: string): Blob => {
   return new Blob([ab], { type: mimeString });
 };
 
-// Main App
 export default function App() {
   const [tab, setTab] = useState<'hoy' | 'armar' | 'placard' | 'agregar' | 'ajustes'>('hoy');
   const [prendas, setPrendas] = useState<Prenda[]>([]);
@@ -98,14 +90,12 @@ export default function App() {
   const [usos, setUsos] = useState<Uso[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Weather state
   const [ciudad, setCiudad] = useState<string>(() => localStorage.getItem('armario_ciudad') || 'Vitoria-Gasteiz');
   const [tempActual, setTempActual] = useState<number | null>(18);
   const [tempMin, setTempMin] = useState<number | null>(11);
   const [tempMax, setTempMax] = useState<number | null>(20);
   const [ocasionFiltro, setOcasionFiltro] = useState<string>(() => localStorage.getItem('armario_ocasion') || 'Trabajo');
 
-  // Load Data
   const loadData = async () => {
     try {
       setLoading(true);
@@ -124,14 +114,12 @@ export default function App() {
 
   useEffect(() => {
     loadData();
-    // Persist storage request
     if (navigator.storage && navigator.storage.persist) {
       navigator.storage.persist().then((persistent) => {
         console.log(`Persistencia de almacenamiento: ${persistent}`);
       });
     }
 
-    // Weather API (Open-Meteo as fallback/weather service)
     const fetchWeather = async (lat: number, lon: number, name?: string) => {
       try {
         const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min&timezone=auto`);
@@ -155,7 +143,7 @@ export default function App() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude, 'Ubicación actual'),
-        () => fetchWeather(42.8467, -2.6716, 'Vitoria-Gasteiz') // Default Vitoria-Gasteiz
+        () => fetchWeather(42.8467, -2.6716, 'Vitoria-Gasteiz')
       );
     } else {
       fetchWeather(42.8467, -2.6716, 'Vitoria-Gasteiz');
@@ -167,10 +155,8 @@ export default function App() {
     localStorage.setItem('armario_ocasion', val);
   };
 
-  // Prenda detail modal state
   const [selectedPrenda, setSelectedPrenda] = useState<Prenda | null>(null);
 
-  // Helper for rendering Blob/Base64 image
   const renderImage = (prenda: Prenda) => {
     if (prenda.fotoBase64) return prenda.fotoBase64;
     if (prenda.fotoBlob) return URL.createObjectURL(prenda.fotoBlob);
@@ -179,7 +165,6 @@ export default function App() {
 
   return (
     <div className="max-w-[420px] mx-auto min-h-screen bg-[#F4F1EA] text-[#111111] flex flex-col justify-between border-x border-[#111111]/10 relative shadow-2xl">
-      {/* Header */}
       <header className="px-5 pt-6 pb-3 border-b border-[#111111] bg-[#FAF8F5] flex justify-between items-center sticky top-0 z-30">
         <div>
           <h1 className="font-condensed text-3xl font-bold tracking-wider text-[#111111]">ARMARIO</h1>
@@ -194,7 +179,6 @@ export default function App() {
         </button>
       </header>
 
-      {/* Main Container */}
       <main className="flex-1 pb-24 overflow-y-auto px-4 pt-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-64 font-mono text-sm">
@@ -262,7 +246,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Modal Detalle Prenda */}
       {selectedPrenda && (
         <ModalPrenda 
           prenda={selectedPrenda} 
@@ -279,7 +262,6 @@ export default function App() {
         />
       )}
 
-      {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-[420px] mx-auto bg-[#FAF8F5] border-t-2 border-[#111111] z-40 flex justify-around p-2">
         <NavButton active={tab === 'hoy'} onClick={() => setTab('hoy')} icon={<Sparkles size={20} />} label="HOY" />
         <NavButton active={tab === 'armar'} onClick={() => setTab('armar')} icon={<Shirt size={20} />} label="ARMAR" />
@@ -302,9 +284,6 @@ function NavButton({ active, onClick, icon, label }: { active: boolean; onClick:
   );
 }
 
-// ----------------------------------------------------------------------
-// TAB 1: HOY
-// ----------------------------------------------------------------------
 function TabHoy({ 
   prendas, 
   looks, 
@@ -335,7 +314,6 @@ function TabHoy({
   const [currentLook, setCurrentLook] = useState<{ arriba?: Prenda; abajo?: Prenda; abrigo?: Prenda } | null>(null);
   const [lookIndex, setLookIndex] = useState(0);
 
-  // Determine climate filter based on temperature
   const getClimaActual = () => {
     if (tempActual === null) return 'Templado';
     if (tempActual >= 20) return 'Calor';
@@ -345,9 +323,7 @@ function TabHoy({
 
   const climaValido = getClimaActual();
 
-  // Suggestion Algorithm
   const generarSugerencias = () => {
-    // Tops and Bottoms filtered by climate and occasion
     const arribaOpts = prendas.filter(p => 
       p.parte === 'Arriba' && 
       (p.clima.includes(climaValido) || p.clima.length === 0) &&
@@ -364,7 +340,6 @@ function TabHoy({
 
     if (arribaOpts.length === 0 || abajoOpts.length === 0) return [];
 
-    // Recent 3 days used looks IDs
     const ultimosTresDias = new Date();
     ultimosTresDias.setDate(ultimosTresDias.getDate() - 3);
     const fechaLimite = ultimosTresDias.toISOString().split('T')[0];
@@ -373,18 +348,15 @@ function TabHoy({
       .filter(u => u.fecha >= fechaLimite)
       .map(u => u.lookId);
 
-    // Build combination list prioritized by usage frequency and last used date
     const combos: { arriba: Prenda; abajo: Prenda; abrigo?: Prenda; score: number }[] = [];
 
     for (const a of arribaOpts) {
       for (const b of abajoOpts) {
-        // Find if this pair forms a known look
         const lookObj = looks.find(l => l.prendasIds.includes(a.id) && l.prendasIds.includes(b.id));
         if (lookObj && recientesIds.includes(lookObj.id)) {
-          continue; // Skip if used in last 3 days
+          continue;
         }
 
-        // Calculate priority score (lower usage = higher priority)
         let score = (a.vecesUsada || 0) + (b.vecesUsada || 0);
         
         let chosenAbrigo: Prenda | undefined = undefined;
@@ -396,9 +368,7 @@ function TabHoy({
       }
     }
 
-    // Sort by score ascending (less used first)
     combos.sort((x, y) => x.score - y.score);
-
     return combos;
   };
 
@@ -425,13 +395,11 @@ function TabHoy({
 
   return (
     <div className="space-y-5">
-      {/* Date Header */}
       <div className="border-b-2 border-[#111111] pb-2 flex justify-between items-baseline">
         <span className="font-mono text-xs uppercase tracking-widest text-[#111111]/70">DÍA ACTUAL</span>
         <span className="font-condensed text-xl font-bold uppercase">{fechaHoy}</span>
       </div>
 
-      {/* Weather Card */}
       <div className="border border-[#111111] bg-[#FAF8F5] p-4 corner-mark relative">
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-1.5">
@@ -463,7 +431,6 @@ function TabHoy({
         </div>
       </div>
 
-      {/* Occasion Segmented Selector */}
       <div>
         <label className="block font-mono text-[10px] uppercase tracking-wider text-[#111111]/70 mb-1">OCASIÓN</label>
         <div className="grid grid-cols-3 gap-1 bg-[#E8E4D9] p-1 border border-[#111111]">
@@ -482,7 +449,6 @@ function TabHoy({
         </div>
       </div>
 
-      {/* Empty State or Look Display */}
       {!tienePrendasSuficientes ? (
         <div className="border border-dashed border-[#111111] p-8 text-center bg-[#FAF8F5] my-6">
           <p className="font-mono text-sm mb-4">TODAVÍA NO CARGASTE ROPA SUFICIENTE</p>
@@ -501,9 +467,7 @@ function TabHoy({
             <span className="font-mono text-[10px] text-[#111111]/60">OPCIÓN {(lookIndex % sugerencias.length) + 1} DE {sugerencias.length}</span>
           </div>
 
-          {/* Cards side by side */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Arriba Card */}
             <div className="border border-[#111111] bg-[#FAF8F5] p-2 corner-mark flex flex-col justify-between">
               <span className="font-mono text-[9px] bg-[#111111]/10 px-1 py-0.5 self-start uppercase font-bold">ARRIBA</span>
               <div className="h-36 my-2 flex items-center justify-center overflow-hidden">
@@ -523,7 +487,6 @@ function TabHoy({
               </div>
             </div>
 
-            {/* Abajo Card */}
             <div className="border border-[#111111] bg-[#FAF8F5] p-2 corner-mark flex flex-col justify-between">
               <span className="font-mono text-[9px] bg-[#111111]/10 px-1 py-0.5 self-start uppercase font-bold">ABAJO</span>
               <div className="h-36 my-2 flex items-center justify-center overflow-hidden">
@@ -544,7 +507,6 @@ function TabHoy({
             </div>
           </div>
 
-          {/* Suggested Coat Banner if temperature < 16 */}
           {currentLook.abrigo && (
             <div className="border border-[#111111] bg-[#FAF8F5] p-3 flex items-center gap-3">
               <div className="w-12 h-12 border border-[#111111] flex items-center justify-center shrink-0 bg-white">
@@ -561,7 +523,6 @@ function TabHoy({
             </div>
           )}
 
-          {/* Reasoning Note */}
           <div className="border border-[#111111] p-3 bg-[#FAF8F5] font-sans text-xs leading-relaxed">
             <p className="font-bold font-mono text-[10px] text-[#111111]/60 mb-0.5">ANÁLISIS DE COMBINACIÓN:</p>
             <p>
@@ -570,7 +531,6 @@ function TabHoy({
             </p>
           </div>
 
-          {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button
               onClick={() => setLookIndex(prev => prev + 1)}
@@ -584,7 +544,6 @@ function TabHoy({
                 const pIds = [currentLook.arriba!.id, currentLook.abajo!.id];
                 if (currentLook.abrigo) pIds.push(currentLook.abrigo.id);
 
-                // Find or create look
                 let lookObj = looks.find(l => 
                   l.prendasIds.length === pIds.length && 
                   l.prendasIds.every(id => pIds.includes(id))
@@ -623,9 +582,6 @@ function TabHoy({
   );
 }
 
-// ----------------------------------------------------------------------
-// TAB 2: ARMAR
-// ----------------------------------------------------------------------
 function TabArmar({ 
   prendas, 
   renderImage, 
@@ -660,7 +616,6 @@ function TabArmar({
         <p className="font-mono text-[10px] text-[#111111]/60">DESLIZA PARA COMBINAR PIEZAS</p>
       </div>
 
-      {/* Carousel Top */}
       <div className="space-y-1">
         <div className="flex justify-between items-center font-mono text-[10px] uppercase font-bold">
           <span>PARTE SUPERIOR</span>
@@ -690,7 +645,6 @@ function TabArmar({
         </div>
       </div>
 
-      {/* Carousel Bottom */}
       <div className="space-y-1">
         <div className="flex justify-between items-center font-mono text-[10px] uppercase font-bold">
           <span>PARTE INFERIOR</span>
@@ -720,7 +674,6 @@ function TabArmar({
         </div>
       </div>
 
-      {/* Details Chips */}
       <div className="border border-[#111111] bg-[#FAF8F5] p-3 space-y-2">
         <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
           <span className="bg-[#111111] text-[#F4F1EA] px-2 py-0.5">{prendaArriba.tela}</span>
@@ -732,7 +685,6 @@ function TabArmar({
         </p>
       </div>
 
-      {/* Action Button */}
       <button
         onClick={() => {
           onSaveLook({
@@ -752,9 +704,6 @@ function TabArmar({
   );
 }
 
-// ----------------------------------------------------------------------
-// TAB 3: PLACARD
-// ----------------------------------------------------------------------
 function TabPlacard({ 
   prendas, 
   looks, 
@@ -775,11 +724,8 @@ function TabPlacard({
     ? prendas 
     : prendas.filter(p => p.parte === filtroParte);
 
-  const looksFavoritos = looks.filter(l => l.favorito);
-
   return (
     <div className="space-y-4">
-      {/* Upper Tab Switching */}
       <div className="grid grid-cols-2 border border-[#111111] bg-[#E8E4D9]">
         <button
           onClick={() => setSeccion('prendas')}
@@ -797,7 +743,6 @@ function TabPlacard({
 
       {seccion === 'prendas' ? (
         <>
-          {/* Sub Filters */}
           <div className="flex gap-1 overflow-x-auto pb-1 font-mono text-[11px]">
             {['Todo', 'Arriba', 'Abajo', 'Abrigo'].map((cat) => (
               <button
@@ -810,7 +755,6 @@ function TabPlacard({
             ))}
           </div>
 
-          {/* Grid 2 Columns */}
           <div className="grid grid-cols-2 gap-3">
             {prendasFiltradas.map((p) => (
               <div
@@ -840,7 +784,6 @@ function TabPlacard({
               </div>
             ))}
 
-            {/* Add Card */}
             <div
               onClick={onGoToAdd}
               className="border border-dashed border-[#111111] bg-transparent p-2 flex flex-col items-center justify-center h-48 cursor-pointer hover:bg-black/5 transition-all text-center"
@@ -851,7 +794,6 @@ function TabPlacard({
           </div>
         </>
       ) : (
-        /* Section Looks */
         <div className="space-y-3">
           {looks.length === 0 ? (
             <div className="border border-dashed border-[#111111] p-8 text-center bg-[#FAF8F5]">
@@ -907,9 +849,6 @@ function TabPlacard({
   );
 }
 
-// ----------------------------------------------------------------------
-// TAB 4: AGREGAR PRENDA
-// ----------------------------------------------------------------------
 function TabAgregar({ onSaved }: { onSaved: () => void }) {
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState('remera');
@@ -977,7 +916,6 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
         <h2 className="font-condensed text-xl font-bold uppercase">REGISTRAR NUEVA PRENDA</h2>
       </div>
 
-      {/* Camera / Photo Section */}
       <div className="border border-[#111111] bg-[#FAF8F5] p-4 text-center corner-mark">
         {previewUrl ? (
           <div className="space-y-3">
@@ -1018,7 +956,6 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
         )}
       </div>
 
-      {/* Grid Fields */}
       <div className="space-y-3">
         <div>
           <label className="block font-mono text-[10px] uppercase font-bold mb-1">NOMBRE DE PRENDA</label>
@@ -1090,7 +1027,6 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
           </div>
         </div>
 
-        {/* Clima Multi Select */}
         <div>
           <label className="block font-mono text-[10px] uppercase font-bold mb-1">CLIMA APTO</label>
           <div className="flex gap-2">
@@ -1107,7 +1043,6 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
           </div>
         </div>
 
-        {/* Ocasión Chips */}
         <div>
           <label className="block font-mono text-[10px] uppercase font-bold mb-1">OCASIONES</label>
           <div className="grid grid-cols-2 gap-2">
@@ -1135,9 +1070,6 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
   );
 }
 
-// ----------------------------------------------------------------------
-// TAB 5: AJUSTES & BACKUP
-// ----------------------------------------------------------------------
 function TabAjustes({ 
   prendasCount, 
   looksCount, 
@@ -1270,9 +1202,6 @@ function TabAjustes({
   );
 }
 
-// ----------------------------------------------------------------------
-// MODAL PRENDA
-// ----------------------------------------------------------------------
 function ModalPrenda({ 
   prenda, 
   looks, 

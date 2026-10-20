@@ -5,7 +5,7 @@ App Web Mobile-First (PWA instalable) para gestionar tu ropa, guardar tus prenda
 ## 🚀 Características
 - **Persistencia Local Completa**: Usa IndexedDB para prendas, fotos comprimidas y outfits guardados.
 - **Blueprint Minimal Aesthetic**: Diseño técnico plano con tonalidades crema (`#F4F1EA`), bordes finos, tipografía condensada y soporte de marcas técnicas.
-- **Clima Automático**: Integración con API de Open-Meteo (confallback en Vitoria-Gasteiz).
+- **Clima Automático**: Integración con API de Open-Meteo (con fallback en Vitoria-Gasteiz).
 - **Algoritmo de Sugerencia Inteligente**: Selecciona según clima y ocasión priorizando prendas menos utilizadas o no usadas recientemente.
 - **Respaldo & Exportación**: Exporta e importa copias de seguridad en formato `.json` con tus fotos en Base64.
 - **PWA Off-line**: Lista para instalarse en la pantalla de inicio del teléfono celular.

@@ -38,7 +38,7 @@ function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains('prendas')) {
         db.createObjectStore('prendas', { keyPath: 'id' });
@@ -137,7 +137,6 @@ export async function registrarUso(lookId: string, prendasIds: string[]): Promis
   const db = await openDB();
   const fechaHoy = new Date().toISOString().split('T')[0];
   
-  // Save uso record
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction('usos', 'readwrite');
     const store = tx.objectStore('usos');
@@ -146,7 +145,6 @@ export async function registrarUso(lookId: string, prendasIds: string[]): Promis
     req.onerror = () => reject(req.error);
   });
 
-  // Update prendas usage counts
   const prendas = await getPrendas();
   for (const pId of prendasIds) {
     const p = prendas.find(item => item.id === pId);

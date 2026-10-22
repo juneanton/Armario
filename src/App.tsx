@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { db, Garment, DEFAULT_TYPES, DEFAULT_OCCASIONS } from './db';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'hoy' | 'crear' | 'armario' | 'añadir'>('hoy');
+  const [activeTab, setActiveTab] = useState<'hoy' | 'crear' | 'placard' | 'agregar'>('hoy');
   const [garments, setGarments] = useState<Garment[]>([]);
   const [types, setTypes] = useState<string[]>(DEFAULT_TYPES);
   const [occasions, setOccasions] = useState<string[]>(DEFAULT_OCCASIONS);
 
-  // Formulario Añadir / Editar
+  // Formulario Agregar / Editar
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formType, setFormType] = useState<string>(DEFAULT_TYPES[0]);
   const [formOccasion, setFormOccasion] = useState<string>(DEFAULT_OCCASIONS[0]);
@@ -27,18 +27,10 @@ export function App() {
     setGarments(allGarments);
 
     const savedTypes = await db.configs.get({ key: 'types' });
-    if (savedTypes && savedTypes.values.length > 0) {
-      setTypes(savedTypes.values);
-    } else {
-      setTypes(DEFAULT_TYPES);
-    }
+    if (savedTypes && savedTypes.values.length > 0) setTypes(savedTypes.values);
 
     const savedOccasions = await db.configs.get({ key: 'occasions' });
-    if (savedOccasions && savedOccasions.values.length > 0) {
-      setOccasions(savedOccasions.values);
-    } else {
-      setOccasions(DEFAULT_OCCASIONS);
-    }
+    if (savedOccasions && savedOccasions.values.length > 0) setOccasions(savedOccasions.values);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,7 +74,7 @@ export function App() {
 
     resetForm();
     loadData();
-    setActiveTab('armario');
+    setActiveTab('placard');
   };
 
   const handleEditClick = (garment: Garment) => {
@@ -93,7 +85,7 @@ export function App() {
     setFormMinTemp(garment.minTemp);
     setFormMaxTemp(garment.maxTemp);
     setFormImage(garment.imageUrl);
-    setActiveTab('añadir');
+    setActiveTab('agregar');
   };
 
   const handleDeleteClick = async (id?: number) => {
@@ -117,7 +109,6 @@ export function App() {
   const desiredOrder = ['Arriba exterior', 'Arriba interior', 'Abajo', 'Zapatos', 'Abrigo', 'Accesorios', 'Entero'];
   const orderedTypes = Array.from(new Set([...desiredOrder, ...types]));
 
-  // Lógica para prendas tipo "Entero"
   const handleSelectGarment = (typeCategory: string, garment: Garment) => {
     if (typeCategory === 'Entero') {
       setSelectedOutfit((prev) => ({
@@ -143,9 +134,11 @@ export function App() {
   return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#111111] font-mono max-w-md mx-auto border-x border-[#111111]">
       {/* Header */}
-      <header className="p-4 border-b border-[#111111] bg-[#FAF8F5]">
-        <h1 className="text-2xl font-black tracking-tighter">ARMARIO</h1>
-        <p className="text-xs tracking-widest text-neutral-500">TECHNICAL DRESSING SYSTEM</p>
+      <header className="p-4 border-b border-[#111111] bg-[#FAF8F5] flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-black tracking-tighter">ARMARIO</h1>
+          <p className="text-xs tracking-widest text-neutral-500">TECHNICAL DRESSING SYSTEM</p>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -172,7 +165,7 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: CREAR (Carruseles en orden estricto) */}
+        {/* TAB: CREAR (Con carruseles en orden estricto) */}
         {activeTab === 'crear' && (
           <div className="space-y-6">
             <h2 className="text-sm font-bold tracking-wider uppercase border-b border-[#111111] pb-1">
@@ -181,6 +174,7 @@ export function App() {
 
             {orderedTypes.map((typeCategory) => {
               const items = garments.filter((g) => g.type === typeCategory);
+              if (items.length === 0) return null;
 
               return (
                 <div key={typeCategory} className="border border-[#111111] p-3 bg-white">
@@ -188,45 +182,41 @@ export function App() {
                     {typeCategory} ({items.length})
                   </span>
 
-                  {items.length === 0 ? (
-                    <p className="text-xs text-neutral-400 italic">Sin prendas registradas</p>
-                  ) : (
-                    <div className="flex gap-3 overflow-x-auto pb-2">
-                      {items.map((garment) => {
-                        const isSelected = selectedOutfit[typeCategory]?.id === garment.id;
-                        return (
-                          <div
-                            key={garment.id}
-                            onClick={() => handleSelectGarment(typeCategory, garment)}
-                            className={`flex-shrink-0 w-24 h-28 border ${
-                              isSelected ? 'border-2 border-black bg-neutral-100' : 'border-neutral-300'
-                            } p-1 cursor-pointer flex flex-col justify-between`}
-                          >
-                            <img
-                              src={garment.imageUrl}
-                              alt={garment.type}
-                              className="w-full h-20 object-cover border border-neutral-200"
-                            />
-                            <span className="text-[10px] text-center font-bold truncate">
-                              {garment.occasion}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {items.map((garment) => {
+                      const isSelected = selectedOutfit[typeCategory]?.id === garment.id;
+                      return (
+                        <div
+                          key={garment.id}
+                          onClick={() => handleSelectGarment(typeCategory, garment)}
+                          className={`flex-shrink-0 w-24 h-28 border ${
+                            isSelected ? 'border-2 border-black bg-neutral-100' : 'border-neutral-300'
+                          } p-1 cursor-pointer flex flex-col justify-between`}
+                        >
+                          <img
+                            src={garment.imageUrl}
+                            alt={garment.type}
+                            className="w-full h-20 object-cover border border-neutral-200"
+                          />
+                          <span className="text-[10px] text-center font-bold truncate">
+                            {garment.occasion}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* TAB: ARMARIO */}
-        {activeTab === 'armario' && (
+        {/* TAB: PLACARD (Armario) */}
+        {activeTab === 'placard' && (
           <div className="space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider border-b border-[#111111] pb-1">
-              MI ARMARIO ({garments.length})
-            </h2>
+            <div className="flex justify-between items-center border-b border-[#111111] pb-1">
+              <h2 className="text-sm font-bold uppercase tracking-wider">MI ARMARIO ({garments.length})</h2>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               {garments.map((item) => (
@@ -256,13 +246,14 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: AÑADIR / EDITAR */}
-        {activeTab === 'añadir' && (
+        {/* TAB: AGREGAR (Añadir / Editar Prenda con soporte de Galería) */}
+        {activeTab === 'agregar' && (
           <form onSubmit={handleSaveGarment} className="space-y-4">
             <h2 className="text-sm font-bold uppercase tracking-wider border-b border-[#111111] pb-1">
               {editingId ? 'EDITAR PRENDA' : 'AÑADIR NUEVA PRENDA'}
             </h2>
 
+            {/* Selector de Imagen: Cámara o Galería */}
             <div className="border border-dashed border-[#111111] p-4 text-center bg-white space-y-2">
               {formImage ? (
                 <img src={formImage} alt="Vista previa" className="w-32 h-32 object-cover mx-auto border" />
@@ -345,14 +336,14 @@ export function App() {
                 type="submit"
                 className="flex-1 bg-[#111111] text-white py-3 text-xs font-bold tracking-widest uppercase hover:bg-neutral-800"
               >
-                {editingId ? 'GUARDAR CAMBIOS' : 'AÑADIR AL ARMARIO'}
+                {editingId ? 'GUARDAR CAMBIOS' : 'GUARDAR PRENDA'}
               </button>
               {editingId && (
                 <button
                   type="button"
                   onClick={() => {
                     resetForm();
-                    setActiveTab('armario');
+                    setActiveTab('placard');
                   }}
                   className="px-4 border border-[#111111] text-xs font-bold"
                 >
@@ -364,7 +355,7 @@ export function App() {
         )}
       </main>
 
-      {/* Nav Bar */}
+      {/* Navigation Bar restaurada con los nombres originales */}
       <nav className="fixed bottom-0 max-w-md w-full bg-[#111111] text-white flex justify-around py-3 border-t border-[#111111]">
         <button
           onClick={() => setActiveTab('hoy')}
@@ -379,19 +370,19 @@ export function App() {
           CREAR
         </button>
         <button
-          onClick={() => setActiveTab('armario')}
-          className={`text-xs font-bold tracking-wider ${activeTab === 'armario' ? 'underline underline-offset-4' : 'opacity-70'}`}
+          onClick={() => setActiveTab('placard')}
+          className={`text-xs font-bold tracking-wider ${activeTab === 'placard' ? 'underline underline-offset-4' : 'opacity-70'}`}
         >
-          ARMARIO
+          PLACARD
         </button>
         <button
           onClick={() => {
             resetForm();
-            setActiveTab('añadir');
+            setActiveTab('agregar');
           }}
-          className={`text-xs font-bold tracking-wider ${activeTab === 'añadir' ? 'underline underline-offset-4' : 'opacity-70'}`}
+          className={`text-xs font-bold tracking-wider ${activeTab === 'agregar' ? 'underline underline-offset-4' : 'opacity-70'}`}
         >
-          AÑADIR
+          AGREGAR
         </button>
       </nav>
     </div>

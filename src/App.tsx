@@ -27,10 +27,18 @@ export function App() {
     setGarments(allGarments);
 
     const savedTypes = await db.configs.get({ key: 'types' });
-    if (savedTypes) setTypes(savedTypes.values);
+    if (savedTypes && savedTypes.values.length > 0) {
+      setTypes(savedTypes.values);
+    } else {
+      setTypes(DEFAULT_TYPES);
+    }
 
     const savedOccasions = await db.configs.get({ key: 'occasions' });
-    if (savedOccasions) setOccasions(savedOccasions.values);
+    if (savedOccasions && savedOccasions.values.length > 0) {
+      setOccasions(savedOccasions.values);
+    } else {
+      setOccasions(DEFAULT_OCCASIONS);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,7 +172,7 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: CREAR (Carruseles) */}
+        {/* TAB: CREAR (Carruseles en orden estricto) */}
         {activeTab === 'crear' && (
           <div className="space-y-6">
             <h2 className="text-sm font-bold tracking-wider uppercase border-b border-[#111111] pb-1">
@@ -292,7 +300,7 @@ export function App() {
                 onChange={(e) => setFormType(e.target.value)}
                 className="w-full border border-[#111111] p-2 bg-white text-xs font-mono"
               >
-                {types.map((t) => (
+                {orderedTypes.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>

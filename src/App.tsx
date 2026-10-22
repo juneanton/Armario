@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { db, Garment, DEFAULT_TYPES, DEFAULT_OCCASIONS } from './db';
-import { Sun, Sparkles, Shirt, PlusCircle, Trash2, Edit } from 'lucide-react';
+import { Sun, Sparkles, Shirt, PlusCircle, Trash2, Edit, Settings, X, Plus } from 'lucide-react';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'hoy' | 'crear' | 'armario' | 'añadir'>('hoy');
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+
   const [garments, setGarments] = useState<Garment[]>([]);
   const [types, setTypes] = useState<string[]>(DEFAULT_TYPES);
   const [occasions, setOccasions] = useState<string[]>(DEFAULT_OCCASIONS);
+
+  // Estados para añadir nuevos Tipos/Ocasiones en Ajustes
+  const [newTypeInput, setNewTypeInput] = useState<string>('');
+  const [newOccasionInput, setNewOccasionInput] = useState<string>('');
 
   // Filtros para la pestaña ARMARIO
   const [filterType, setFilterType] = useState<string>('TODOS');
@@ -31,10 +37,65 @@ export function App() {
     setGarments(allGarments);
 
     const savedTypes = await db.configs.get({ key: 'types' });
-    if (savedTypes && savedTypes.values.length > 0) setTypes(savedTypes.values);
+    if (savedTypes && savedTypes.values.length > 0) {
+      setTypes(savedTypes.values);
+    } else {
+      setTypes(DEFAULT_TYPES);
+    }
 
     const savedOccasions = await db.configs.get({ key: 'occasions' });
-    if (savedOccasions && savedOccasions.values.length > 0) setOccasions(savedOccasions.values);
+    if (savedOccasions && savedOccasions.values.length > 0) {
+      setOccasions(savedOccasions.values);
+    } else {
+      setOccasions(DEFAULT_OCCASIONS);
+    }
+  };
+
+  // Funciones de Ajustes (Añadir / Eliminar Tipos u Ocasiones)
+  const handleAddType = async () => {
+    if (!newTypeInput.trim()) return;
+    const updatedTypes = [...types, newTypeInput.trim()];
+    setTypes(updatedTypes);
+    
+    const existing = await db.configs.get({ key: 'types' });
+    if (existing && existing.id) {
+      await db.configs.update(existing.id, { values: updatedTypes });
+    } else {
+      await db.configs.add({ key: 'types', values: updatedTypes });
+    }
+    setNewTypeInput('');
+  };
+
+  const handleDeleteType = async (typeToDelete: string) => {
+    const updatedTypes = types.filter(t => t !== typeToDelete);
+    setTypes(updatedTypes);
+    const existing = await db.configs.get({ key: 'types' });
+    if (existing && existing.id) {
+      await db.configs.update(existing.id, { values: updatedTypes });
+    }
+  };
+
+  const handleAddOccasion = async () => {
+    if (!newOccasionInput.trim()) return;
+    const updatedOccasions = [...occasions, newOccasionInput.trim().toUpperCase()];
+    setOccasions(updatedOccasions);
+    
+    const existing = await db.configs.get({ key: 'occasions' });
+    if (existing && existing.id) {
+      await db.configs.update(existing.id, { values: updatedOccasions });
+    } else {
+      await db.configs.add({ key: 'occasions', values: updatedOccasions });
+    }
+    setNewOccasionInput('');
+  };
+
+  const handleDeleteOccasion = async (occToDelete: string) => {
+    const updatedOccasions = occasions.filter(o => o !== occToDelete);
+    setOccasions(updatedOccasions);
+    const existing = await db.configs.get({ key: 'occasions' });
+    if (existing && existing.id) {
+      await db.configs.update(existing.id, { values: updatedOccasions });
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,13 +209,110 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#111111] font-mono max-w-md mx-auto border-x border-[#111111]">
-      {/* Header */}
+      {/* Header con Botón de Ajustes */}
       <header className="p-4 border-b border-[#111111] bg-[#FAF8F5] flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-black tracking-tighter">ARMARIO</h1>
           <p className="text-xs tracking-widest text-neutral-500">TECHNICAL DRESSING SYSTEM</p>
         </div>
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="p-2 border border-[#111111] bg-white hover:bg-neutral-100 transition-colors"
+          title="Ajustes"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
       </header>
+
+      {/* MODAL DE AJUSTES */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#FAF8F5] border-2 border-[#111111] p-4 w-full max-w-md max-h-[85vh] overflow-y-auto space-y-6">
+            <div className="flex justify-between items-center border-b border-[#111111] pb-2">
+              <h2 className="text-sm font-black uppercase tracking-wider">CONFIGURACIÓN DEL SISTEMA</h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-1 border border-[#111111] hover:bg-red-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Gestión de Tipos */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase">Categorías / Tipos de Prenda</h3>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nuevo tipo..."
+                  value={newTypeInput}
+                  onChange={(e) => setNewTypeInput(e.target.value)}
+                  className="flex-1 border border-[#111111] p-1 text-xs font-mono bg-white"
+                />
+                <button
+                  onClick={handleAddType}
+                  className="bg-[#111111] text-white px-3 py-1 text-xs font-bold flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> AÑADIR
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1 pt-1">
+                {types.map((t) => (
+                  <span
+                    key={t}
+                    className="border border-[#111111] bg-white text-[10px] font-bold px-2 py-1 flex items-center gap-1"
+                  >
+                    {t}
+                    {!DEFAULT_TYPES.includes(t) && (
+                      <button onClick={() => handleDeleteType(t)} className="text-red-600 font-black ml-1">×</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Gestión de Ocasiones */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase">Ocasiones</h3>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nueva ocasión..."
+                  value={newOccasionInput}
+                  onChange={(e) => setNewOccasionInput(e.target.value)}
+                  className="flex-1 border border-[#111111] p-1 text-xs font-mono bg-white uppercase"
+                />
+                <button
+                  onClick={handleAddOccasion}
+                  className="bg-[#111111] text-white px-3 py-1 text-xs font-bold flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> AÑADIR
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1 pt-1">
+                {occasions.map((o) => (
+                  <span
+                    key={o}
+                    className="border border-[#111111] bg-white text-[10px] font-bold px-2 py-1 flex items-center gap-1"
+                  >
+                    {o}
+                    {!DEFAULT_OCCASIONS.includes(o) && (
+                      <button onClick={() => handleDeleteOccasion(o)} className="text-red-600 font-black ml-1">×</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowSettings(false)}
+              className="w-full bg-[#111111] text-white py-2 text-xs font-bold uppercase tracking-widest mt-4"
+            >
+              CERRAR Y GUARDAR
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="p-4 pb-24">

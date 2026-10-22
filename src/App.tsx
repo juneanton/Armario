@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, Garment, DEFAULT_TYPES, DEFAULT_OCCASIONS } from './db';
-import { Sun, Sparkles, Shirt, PlusCircle, Trash2, Edit, Settings, X, Plus } from 'lucide-react';
+import { Sun, Sparkles, Shirt, PlusCircle, Trash2, Edit, Settings, X, Plus, Download, Upload, RefreshCw } from 'lucide-react';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'hoy' | 'crear' | 'armario' | 'añadir'>('hoy');
@@ -51,12 +51,74 @@ export function App() {
     }
   };
 
+  // Exportar datos a un archivo JSON
+  const handleExportData = async () => {
+    const allGarments = await db.garments.toArray();
+    const allConfigs = await db.configs.toArray();
+
+    const dataToExport = {
+      garments: allGarments,
+      configs: allConfigs,
+      exportedAt: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `armario-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Importar datos desde un archivo JSON
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsedData = JSON.parse(content);
+
+        if (parsedData.garments && Array.isArray(parsedData.garments)) {
+          await db.garments.clear();
+          await db.garments.bulkAdd(parsedData.garments);
+        }
+
+        if (parsedData.configs && Array.isArray(parsedData.configs)) {
+          await db.configs.clear();
+          await db.configs.bulkAdd(parsedData.configs);
+        }
+
+        alert('¡Datos importados con éxito!');
+        loadData();
+        setShowSettings(false);
+      } catch (err) {
+        alert('Error al leer el archivo JSON. Verifica que sea un respaldo válido.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Restablecer/Limpiar la base de datos
+  const handleResetData = async () => {
+    if (confirm('¿Estás seguro de que deseas borrar TODAS las prendas y datos del armario? Esta acción no se puede deshacer.')) {
+      await db.garments.clear();
+      await db.configs.clear();
+      alert('Se han borrado todos los datos.');
+      loadData();
+      setShowSettings(false);
+    }
+  };
+
   // Funciones de Ajustes (Añadir / Eliminar Tipos u Ocasiones)
   const handleAddType = async () => {
     if (!newTypeInput.trim()) return;
     const updatedTypes = [...types, newTypeInput.trim()];
     setTypes(updatedTypes);
-    
+
     const existing = await db.configs.get({ key: 'types' });
     if (existing && existing.id) {
       await db.configs.update(existing.id, { values: updatedTypes });
@@ -79,7 +141,7 @@ export function App() {
     if (!newOccasionInput.trim()) return;
     const updatedOccasions = [...occasions, newOccasionInput.trim().toUpperCase()];
     setOccasions(updatedOccasions);
-    
+
     const existing = await db.configs.get({ key: 'occasions' });
     if (existing && existing.id) {
       await db.configs.update(existing.id, { values: updatedOccasions });
@@ -302,6 +364,38 @@ export function App() {
                   </span>
                 ))}
               </div>
+            </div>
+
+            {/* Copia de Seguridad e Importación/Exportación JSON */}
+            <div className="border-t border-[#111111] pt-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase">Copia de Seguridad (JSON)</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleExportData}
+                  className="border border-[#111111] bg-white text-xs font-bold p-2 flex items-center justify-center gap-1 hover:bg-neutral-100"
+                >
+                  <Download className="w-3 h-3" /> EXPORTAR JSON
+                </button>
+                <label className="border border-[#111111] bg-white text-xs font-bold p-2 flex items-center justify-center gap-1 cursor-pointer hover:bg-neutral-100">
+                  <Upload className="w-3 h-3" /> IMPORTAR JSON
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportData}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Reset / Limpieza de datos */}
+            <div className="border-t border-[#111111] pt-4">
+              <button
+                onClick={handleResetData}
+                className="w-full border border-red-600 text-red-600 bg-red-50 p-2 text-xs font-bold uppercase flex items-center justify-center gap-1 hover:bg-red-100"
+              >
+                <RefreshCw className="w-3 h-3" /> RESTABLECER TODO
+              </button>
             </div>
 
             <button

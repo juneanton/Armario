@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, Garment, DEFAULT_TYPES, DEFAULT_OCCASIONS } from './db';
+import { Sun, Sparkles, Shirt, PlusCircle, Trash2, Edit } from 'lucide-react';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'hoy' | 'crear' | 'armario' | 'añadir'>('hoy');
@@ -7,11 +8,15 @@ export function App() {
   const [types, setTypes] = useState<string[]>(DEFAULT_TYPES);
   const [occasions, setOccasions] = useState<string[]>(DEFAULT_OCCASIONS);
 
+  // Filtros para la pestaña ARMARIO
+  const [filterType, setFilterType] = useState<string>('TODOS');
+  const [filterOccasion, setFilterOccasion] = useState<string>('TODAS');
+
   // Formulario Añadir / Editar
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formType, setFormType] = useState<string>(DEFAULT_TYPES[0]);
   const [formOccasions, setFormOccasions] = useState<string[]>([]);
-  const [formClimates, setFormClimates] = useState<string[]>(['TEMPLADO']); // Selección múltiple de clima: Frío, Templado, Calor
+  const [formClimates, setFormClimates] = useState<string[]>(['TEMPLADO']);
   const [formImage, setFormImage] = useState<string>('');
 
   // Selección de Look en CREAR
@@ -56,7 +61,6 @@ export function App() {
     }
 
     const occasionString = formOccasions.join(', ');
-    // Guardamos los climas seleccionados en los campos numéricos o como texto descriptivo según prefieras
     const minTemp = formClimates.includes('FRÍO') ? 0 : formClimates.includes('TEMPLADO') ? 10 : 20;
     const maxTemp = formClimates.includes('CALOR') ? 35 : formClimates.includes('TEMPLADO') ? 25 : 15;
 
@@ -73,8 +77,8 @@ export function App() {
       await db.garments.add({
         type: formType,
         occasion: occasionString,
-        minTemp,
-        maxTemp,
+        minTemp: formMinTemp,
+        maxTemp: formMaxTemp,
         imageUrl: formImage,
         createdAt: new Date(),
       });
@@ -135,6 +139,13 @@ export function App() {
       }));
     }
   };
+
+  // Filtrado de prendas en la pestaña Armario
+  const filteredGarments = garments.filter((item) => {
+    const matchesType = filterType === 'TODOS' || item.type === filterType;
+    const matchesOccasion = filterOccasion === 'TODAS' || item.occasion.includes(filterOccasion);
+    return matchesType && matchesOccasion;
+  });
 
   return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#111111] font-mono max-w-md mx-auto border-x border-[#111111]">
@@ -216,37 +227,75 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: ARMARIO */}
+        {/* TAB: ARMARIO CON FILTROS */}
         {activeTab === 'armario' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center border-b border-[#111111] pb-1">
-              <h2 className="text-sm font-bold uppercase tracking-wider">MI ARMARIO ({garments.length})</h2>
+              <h2 className="text-sm font-bold uppercase tracking-wider">MI ARMARIO ({filteredGarments.length})</h2>
             </div>
 
+            {/* Filtros de prendas */}
+            <div className="grid grid-cols-2 gap-2 bg-white p-2 border border-[#111111]">
+              <div>
+                <label className="block text-[10px] font-bold uppercase mb-1">Filtrar por Tipo</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full border border-[#111111] p-1 text-[11px] font-mono bg-[#FAF8F5]"
+                >
+                  <option value="TODOS">TODOS LOS TIPOS</option>
+                  {orderedTypes.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase mb-1">Filtrar por Ocasión</label>
+                <select
+                  value={filterOccasion}
+                  onChange={(e) => setFilterOccasion(e.target.value)}
+                  className="w-full border border-[#111111] p-1 text-[11px] font-mono bg-[#FAF8F5]"
+                >
+                  <option value="TODAS">TODAS LAS OCASIONES</option>
+                  {occasions.map((o) => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Listado de prendas filtradas */}
             <div className="grid grid-cols-2 gap-3">
-              {garments.map((item) => (
-                <div key={item.id} className="border border-[#111111] bg-white p-2 flex flex-col justify-between">
-                  <img src={item.imageUrl} alt={item.type} className="w-full h-32 object-cover border mb-2" />
-                  <div className="text-xs space-y-1">
-                    <p className="font-bold uppercase">{item.type}</p>
-                    <p className="text-[10px] text-neutral-600">{item.occasion} | {item.minTemp}°C - {item.maxTemp}°C</p>
-                  </div>
-                  <div className="flex gap-2 mt-3 pt-2 border-t border-neutral-200">
-                    <button
-                      onClick={() => handleEditClick(item)}
-                      className="flex-1 bg-neutral-900 text-white text-[10px] py-1 font-bold hover:bg-black"
-                    >
-                      EDITAR
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(item.id)}
-                      className="px-2 border border-[#111111] text-[10px] font-bold hover:bg-red-50"
-                    >
-                      X
-                    </button>
-                  </div>
+              {filteredGarments.length === 0 ? (
+                <div className="col-span-2 text-center py-8 text-xs text-neutral-500 italic">
+                  No hay prendas que coincidan con los filtros.
                 </div>
-              ))}
+              ) : (
+                filteredGarments.map((item) => (
+                  <div key={item.id} className="border border-[#111111] bg-white p-2 flex flex-col justify-between">
+                    <img src={item.imageUrl} alt={item.type} className="w-full h-32 object-cover border mb-2" />
+                    <div className="text-xs space-y-1">
+                      <p className="font-bold uppercase">{item.type}</p>
+                      <p className="text-[10px] text-neutral-600">{item.occasion}</p>
+                    </div>
+                    <div className="flex gap-2 mt-3 pt-2 border-t border-neutral-200">
+                      <button
+                        onClick={() => handleEditClick(item)}
+                        className="flex-1 bg-neutral-900 text-white text-[10px] py-1 font-bold hover:bg-black flex items-center justify-center gap-1"
+                      >
+                        <Edit className="w-3 h-3" /> EDITAR
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(item.id)}
+                        className="px-2 border border-[#111111] text-[10px] font-bold hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3 h-3 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -277,141 +326,4 @@ export function App() {
                     className="hidden"
                   />
                 </label>
-                <label className="border border-[#111111] bg-white text-xs px-3 py-2 cursor-pointer font-bold">
-                  🖼️ GALERÍA
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase mb-1">Tipo de Prenda</label>
-              <select
-                value={formType}
-                onChange={(e) => setFormType(e.target.value)}
-                className="w-full border border-[#111111] p-2 bg-white text-xs font-mono"
-              >
-                {orderedTypes.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Ocasiones (Selección múltiple) */}
-            <div>
-              <label className="block text-xs font-bold uppercase mb-1">Ocasiones (Selección múltiple)</label>
-              <div className="grid grid-cols-2 gap-2 border border-[#111111] p-2 bg-white">
-                {occasions.map((occ) => {
-                  const isChecked = formOccasions.includes(occ);
-                  return (
-                    <label key={occ} className="flex items-center space-x-2 text-xs cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormOccasions([...formOccasions, occ]);
-                          } else {
-                            setFormOccasions(formOccasions.filter(o => o !== occ));
-                          }
-                        }}
-                        className="accent-black"
-                      />
-                      <span className="uppercase font-bold">{occ}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Clima / Tiempo (Selección múltiple: Frío, Templado, Calor) */}
-            <div>
-              <label className="block text-xs font-bold uppercase mb-1">Clima (Selección múltiple)</label>
-              <div className="grid grid-cols-3 gap-2 border border-[#111111] p-2 bg-white">
-                {['FRÍO', 'TEMPLADO', 'CALOR'].map((clim) => {
-                  const isChecked = formClimates.includes(clim);
-                  return (
-                    <label key={clim} className="flex items-center space-x-1 text-xs cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormClimates([...formClimates, clim]);
-                          } else {
-                            setFormClimates(formClimates.filter(c => c !== clim));
-                          }
-                        }}
-                        className="accent-black"
-                      />
-                      <span className="uppercase font-bold text-[10px]">{clim}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                className="flex-1 bg-[#111111] text-white py-3 text-xs font-bold tracking-widest uppercase hover:bg-neutral-800"
-              >
-                {editingId ? 'GUARDAR CAMBIOS' : 'AÑADIR AL ARMARIO'}
-              </button>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetForm();
-                    setActiveTab('armario');
-                  }}
-                  className="px-4 border border-[#111111] text-xs font-bold"
-                >
-                  CANCELAR
-                </button>
-              )}
-            </div>
-          </form>
-        )}
-      </main>
-
-      {/* Navigation Bar original restaurada */}
-      <nav className="fixed bottom-0 max-w-md w-full bg-[#111111] text-white flex justify-around py-3 border-t border-[#111111]">
-        <button
-          onClick={() => setActiveTab('hoy')}
-          className={`text-xs font-bold tracking-wider ${activeTab === 'hoy' ? 'underline underline-offset-4' : 'opacity-70'}`}
-        >
-          HOY
-        </button>
-        <button
-          onClick={() => setActiveTab('crear')}
-          className={`text-xs font-bold tracking-wider ${activeTab === 'crear' ? 'underline underline-offset-4' : 'opacity-70'}`}
-        >
-          CREAR
-        </button>
-        <button
-          onClick={() => setActiveTab('armario')}
-          className={`text-xs font-bold tracking-wider ${activeTab === 'armario' ? 'underline underline-offset-4' : 'opacity-70'}`}
-        >
-          ARMARIO
-        </button>
-        <button
-          onClick={() => {
-            resetForm();
-            setActiveTab('añadir');
-          }}
-          className={`text-xs font-bold tracking-wider ${activeTab === 'añadir' ? 'underline underline-offset-4' : 'opacity-70'}`}
-        >
-          AÑADIR
-        </button>
-      </nav>
-    </div>
-  );
-}
-
-export default App;
+                <label className

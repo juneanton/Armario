@@ -2,17 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { db, Garment, DEFAULT_TYPES, DEFAULT_OCCASIONS } from './db';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'hoy' | 'crear' | 'placard' | 'agregar'>('hoy');
+  const [activeTab, setActiveTab] = useState<'hoy' | 'crear' | 'armario' | 'añadir'>('hoy');
   const [garments, setGarments] = useState<Garment[]>([]);
   const [types, setTypes] = useState<string[]>(DEFAULT_TYPES);
   const [occasions, setOccasions] = useState<string[]>(DEFAULT_OCCASIONS);
 
-  // Formulario Agregar / Editar
+  // Formulario Añadir / Editar
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formType, setFormType] = useState<string>(DEFAULT_TYPES[0]);
-  const [formOccasions, setFormOccasions] = useState<string[]>([]); // Selección múltiple de ocasiones
-  const [formMinTemp, setFormMinTemp] = useState<number>(10);
-  const [formMaxTemp, setFormMaxTemp] = useState<number>(25);
+  const [formOccasions, setFormOccasions] = useState<string[]>([]);
+  const [formClimates, setFormClimates] = useState<string[]>(['TEMPLADO']); // Selección múltiple de clima: Frío, Templado, Calor
   const [formImage, setFormImage] = useState<string>('');
 
   // Selección de Look en CREAR
@@ -56,15 +55,17 @@ export function App() {
       return;
     }
 
-    // Guardamos las ocasiones unidas por coma para mantener compatibilidad múltiple
     const occasionString = formOccasions.join(', ');
+    // Guardamos los climas seleccionados en los campos numéricos o como texto descriptivo según prefieras
+    const minTemp = formClimates.includes('FRÍO') ? 0 : formClimates.includes('TEMPLADO') ? 10 : 20;
+    const maxTemp = formClimates.includes('CALOR') ? 35 : formClimates.includes('TEMPLADO') ? 25 : 15;
 
     if (editingId) {
       await db.garments.update(editingId, {
         type: formType,
         occasion: occasionString,
-        minTemp: formMinTemp,
-        maxTemp: formMaxTemp,
+        minTemp,
+        maxTemp,
         imageUrl: formImage,
       });
       alert('Prenda actualizada correctamente');
@@ -72,8 +73,8 @@ export function App() {
       await db.garments.add({
         type: formType,
         occasion: occasionString,
-        minTemp: formMinTemp,
-        maxTemp: formMaxTemp,
+        minTemp,
+        maxTemp,
         imageUrl: formImage,
         createdAt: new Date(),
       });
@@ -82,7 +83,7 @@ export function App() {
 
     resetForm();
     loadData();
-    setActiveTab('placard');
+    setActiveTab('armario');
   };
 
   const handleEditClick = (garment: Garment) => {
@@ -90,10 +91,8 @@ export function App() {
     setEditingId(garment.id);
     setFormType(garment.type);
     setFormOccasions(garment.occasion ? garment.occasion.split(', ').map(o => o.trim()) : []);
-    setFormMinTemp(garment.minTemp);
-    setFormMaxTemp(garment.maxTemp);
     setFormImage(garment.imageUrl);
-    setActiveTab('agregar');
+    setActiveTab('añadir');
   };
 
   const handleDeleteClick = async (id?: number) => {
@@ -108,12 +107,10 @@ export function App() {
     setEditingId(null);
     setFormType(types[0] || DEFAULT_TYPES[0]);
     setFormOccasions([DEFAULT_OCCASIONS[0]]);
-    setFormMinTemp(10);
-    setFormMaxTemp(25);
+    setFormClimates(['TEMPLADO']);
     setFormImage('');
   };
 
-  // Orden estricto de carruseles solicitado
   const desiredOrder = ['Arriba exterior', 'Arriba interior', 'Abajo', 'Zapatos', 'Abrigo', 'Accesorios', 'Entero'];
   const orderedTypes = Array.from(new Set([...desiredOrder, ...types]));
 
@@ -173,7 +170,7 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: CREAR (Carruseles en orden estricto) */}
+        {/* TAB: CREAR */}
         {activeTab === 'crear' && (
           <div className="space-y-6">
             <h2 className="text-sm font-bold tracking-wider uppercase border-b border-[#111111] pb-1">
@@ -219,8 +216,8 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: PLACARD (Armario) */}
-        {activeTab === 'placard' && (
+        {/* TAB: ARMARIO */}
+        {activeTab === 'armario' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center border-b border-[#111111] pb-1">
               <h2 className="text-sm font-bold uppercase tracking-wider">MI ARMARIO ({garments.length})</h2>
@@ -254,8 +251,8 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: AGREGAR (Añadir / Editar con Selección Múltiple) */}
-        {activeTab === 'agregar' && (
+        {/* TAB: AÑADIR */}
+        {activeTab === 'añadir' && (
           <form onSubmit={handleSaveGarment} className="space-y-4">
             <h2 className="text-sm font-bold uppercase tracking-wider border-b border-[#111111] pb-1">
               {editingId ? 'EDITAR PRENDA' : 'AÑADIR NUEVA PRENDA'}
@@ -305,7 +302,7 @@ export function App() {
               </select>
             </div>
 
-            {/* Ocasión (Selección múltiple mediante checkboxes / botones de selección) */}
+            {/* Ocasiones (Selección múltiple) */}
             <div>
               <label className="block text-xs font-bold uppercase mb-1">Ocasiones (Selección múltiple)</label>
               <div className="grid grid-cols-2 gap-2 border border-[#111111] p-2 bg-white">
@@ -332,24 +329,30 @@ export function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-bold uppercase mb-1">Mín (°C)</label>
-                <input
-                  type="number"
-                  value={formMinTemp}
-                  onChange={(e) => setFormMinTemp(Number(e.target.value))}
-                  className="w-full border border-[#111111] p-2 bg-white text-xs font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase mb-1">Máx (°C)</label>
-                <input
-                  type="number"
-                  value={formMaxTemp}
-                  onChange={(e) => setFormMaxTemp(Number(e.target.value))}
-                  className="w-full border border-[#111111] p-2 bg-white text-xs font-mono"
-                />
+            {/* Clima / Tiempo (Selección múltiple: Frío, Templado, Calor) */}
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1">Clima (Selección múltiple)</label>
+              <div className="grid grid-cols-3 gap-2 border border-[#111111] p-2 bg-white">
+                {['FRÍO', 'TEMPLADO', 'CALOR'].map((clim) => {
+                  const isChecked = formClimates.includes(clim);
+                  return (
+                    <label key={clim} className="flex items-center space-x-1 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormClimates([...formClimates, clim]);
+                          } else {
+                            setFormClimates(formClimates.filter(c => c !== clim));
+                          }
+                        }}
+                        className="accent-black"
+                      />
+                      <span className="uppercase font-bold text-[10px]">{clim}</span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
 
@@ -365,7 +368,7 @@ export function App() {
                   type="button"
                   onClick={() => {
                     resetForm();
-                    setActiveTab('placard');
+                    setActiveTab('armario');
                   }}
                   className="px-4 border border-[#111111] text-xs font-bold"
                 >
@@ -377,7 +380,7 @@ export function App() {
         )}
       </main>
 
-      {/* Navigation Bar */}
+      {/* Navigation Bar original restaurada */}
       <nav className="fixed bottom-0 max-w-md w-full bg-[#111111] text-white flex justify-around py-3 border-t border-[#111111]">
         <button
           onClick={() => setActiveTab('hoy')}
@@ -392,19 +395,19 @@ export function App() {
           CREAR
         </button>
         <button
-          onClick={() => setActiveTab('placard')}
-          className={`text-xs font-bold tracking-wider ${activeTab === 'placard' ? 'underline underline-offset-4' : 'opacity-70'}`}
+          onClick={() => setActiveTab('armario')}
+          className={`text-xs font-bold tracking-wider ${activeTab === 'armario' ? 'underline underline-offset-4' : 'opacity-70'}`}
         >
-          PLACARD
+          ARMARIO
         </button>
         <button
           onClick={() => {
             resetForm();
-            setActiveTab('agregar');
+            setActiveTab('añadir');
           }}
-          className={`text-xs font-bold tracking-wider ${activeTab === 'agregar' ? 'underline underline-offset-4' : 'opacity-70'}`}
+          className={`text-xs font-bold tracking-wider ${activeTab === 'añadir' ? 'underline underline-offset-4' : 'opacity-70'}`}
         >
-          AGREGAR
+          AÑADIR
         </button>
       </nav>
     </div>

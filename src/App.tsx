@@ -307,4 +307,163 @@ export function App() {
             </h2>
 
             {/* Selector de Imagen: Cámara o Galería */}
-            <div className="border border-dashed border-[#111111] p-
+            <div className="border border-dashed border-[#111111] p-4 text-center bg-white space-y-2">
+              {formImage ? (
+                <img src={formImage} alt="Vista previa" className="w-32 h-32 object-cover mx-auto border" />
+              ) : (
+                <div className="text-xs text-neutral-500">Sin foto seleccionada</div>
+              )}
+
+              <div className="flex gap-2 justify-center pt-2">
+                <label className="bg-[#111111] text-white text-xs px-3 py-2 cursor-pointer font-bold">
+                  📷 CÁMARA
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </label>
+                <label className="border border-[#111111] bg-white text-xs px-3 py-2 cursor-pointer font-bold">
+                  🖼️ GALERÍA
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1">Tipo de Prenda</label>
+              <select
+                value={formType}
+                onChange={(e) => setFormType(e.target.value)}
+                className="w-full border border-[#111111] p-2 bg-white text-xs font-mono"
+              >
+                {orderedTypes.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Ocasiones (Selección múltiple) */}
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1">Ocasiones (Selección múltiple)</label>
+              <div className="grid grid-cols-2 gap-2 border border-[#111111] p-2 bg-white">
+                {occasions.map((occ) => {
+                  const isChecked = formOccasions.includes(occ);
+                  return (
+                    <label key={occ} className="flex items-center space-x-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormOccasions([...formOccasions, occ]);
+                          } else {
+                            setFormOccasions(formOccasions.filter(o => o !== occ));
+                          }
+                        }}
+                        className="accent-black"
+                      />
+                      <span className="uppercase font-bold">{occ}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Clima / Tiempo (Selección múltiple) */}
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1">Clima (Selección múltiple)</label>
+              <div className="grid grid-cols-3 gap-2 border border-[#111111] p-2 bg-white">
+                {['FRÍO', 'TEMPLADO', 'CALOR'].map((clim) => {
+                  const isChecked = formClimates.includes(clim);
+                  return (
+                    <label key={clim} className="flex items-center space-x-1 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormClimates([...formClimates, clim]);
+                          } else {
+                            setFormClimates(formClimates.filter(c => c !== clim));
+                          }
+                        }}
+                        className="accent-black"
+                      />
+                      <span className="uppercase font-bold text-[10px]">{clim}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="submit"
+                className="flex-1 bg-[#111111] text-white py-3 text-xs font-bold tracking-widest uppercase hover:bg-neutral-800"
+              >
+                {editingId ? 'GUARDAR CAMBIOS' : 'AÑADIR AL ARMARIO'}
+              </button>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetForm();
+                    setActiveTab('armario');
+                  }}
+                  className="px-4 border border-[#111111] text-xs font-bold"
+                >
+                  CANCELAR
+                </button>
+              )}
+            </div>
+          </form>
+        )}
+      </main>
+
+      {/* Navigation Bar con Iconos y Nombres */}
+      <nav className="fixed bottom-0 max-w-md w-full bg-[#111111] text-white flex justify-around py-2 border-t border-[#111111]">
+        <button
+          onClick={() => setActiveTab('hoy')}
+          className={`flex flex-col items-center text-[10px] font-bold tracking-wider ${activeTab === 'hoy' ? 'opacity-100 underline underline-offset-4' : 'opacity-60'}`}
+        >
+          <Sun className="w-5 h-5 mb-1" />
+          HOY
+        </button>
+        <button
+          onClick={() => setActiveTab('crear')}
+          className={`flex flex-col items-center text-[10px] font-bold tracking-wider ${activeTab === 'crear' ? 'opacity-100 underline underline-offset-4' : 'opacity-60'}`}
+        >
+          <Sparkles className="w-5 h-5 mb-1" />
+          CREAR
+        </button>
+        <button
+          onClick={() => setActiveTab('armario')}
+          className={`flex flex-col items-center text-[10px] font-bold tracking-wider ${activeTab === 'armario' ? 'opacity-100 underline underline-offset-4' : 'opacity-60'}`}
+        >
+          <Shirt className="w-5 h-5 mb-1" />
+          ARMARIO
+        </button>
+        <button
+          onClick={() => {
+            resetForm();
+            setActiveTab('añadir');
+          }}
+          className={`flex flex-col items-center text-[10px] font-bold tracking-wider ${activeTab === 'añadir' ? 'opacity-100 underline underline-offset-4' : 'opacity-60'}`}
+        >
+          <PlusCircle className="w-5 h-5 mb-1" />
+          AÑADIR
+        </button>
+      </nav>
+    </div>
+  );
+}
+
+export default App;

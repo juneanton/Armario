@@ -1,6 +1,6 @@
-// Simple, robust IndexedDB implementation without external heavy library issues
+// IndexedDB implementation with dynamic options (Tipos and Ocasiones)
 const DB_NAME = 'ArmarioDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export interface Prenda {
   id: string;
@@ -8,7 +8,7 @@ export interface Prenda {
   fotoBase64?: string;
   nombre: string;
   tipo: string;
-  parte: 'Arriba' | 'Abajo' | 'Entero' | 'Abrigo';
+  parte: 'Arriba interior' | 'Arriba exterior' | 'Abajo' | 'Abrigo' | 'Accesorios' | 'Zapatos' | 'Entero';
   color: string;
   tela: string;
   clima: string[];
@@ -34,11 +34,19 @@ export interface Uso {
   prendasIds: string[];
 }
 
+export interface ConfigOp {
+  key: 'tipos' | 'ocasiones';
+  values: string[];
+}
+
+const DEFAULT_TIPOS = ['remera', 'camisa', 'blusa', 'pantalón', 'pollera', 'vestido', 'abrigo', 'calzado', 'accesorio', 'top', 'campera', 'suéter'];
+const DEFAULT_OCASIONES = ['Trabajo', 'Salida', 'Finde', 'Casa'];
+
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
       if (!db.objectStoreNames.contains('prendas')) {
         db.createObjectStore('prendas', { keyPath: 'id' });
@@ -48,6 +56,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains('usos')) {
         db.createObjectStore('usos', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('config')) {
+        db.createObjectStore('config', { keyPath: 'key' });
       }
     };
 
@@ -156,9 +167,38 @@ export async function registrarUso(lookId: string, prendasIds: string[]): Promis
   }
 }
 
+// Config Tipos & Ocasiones
+export async function getCustomList(key: 'tipos' | 'ocasiones'): Promise<string[]> {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction('config', 'readonly');
+    const store = tx.objectStore('config');
+    const req = store.get(key);
+    req.onsuccess = () => {
+      if (req.result && req.result.values) {
+        resolve(req.result.values);
+      } else {
+        resolve(key === 'tipos' ? DEFAULT_TIPOS : DEFAULT_OCASIONES);
+      }
+    };
+    req.onerror = () => resolve(key === 'tipos' ? DEFAULT_TIPOS : DEFAULT_OCASIONES);
+  });
+}
+
+export async function saveCustomList(key: 'tipos' | 'ocasiones', values: string[]): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('config', 'readwrite');
+    const store = tx.objectStore('config');
+    const req = store.put({ key, values });
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function clearAllData(): Promise<void> {
   const db = await openDB();
-  const stores = ['prendas', 'looks', 'usos'];
+  const stores = ['prendas', 'looks', 'usos', 'config'];
   for (const s of stores) {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(s, 'readwrite');

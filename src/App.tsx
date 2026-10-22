@@ -18,9 +18,37 @@ import {
   RefreshCw, 
   Download, 
   MapPin,
-  X
+  X,
+  PlusCircle
 } from 'lucide-react';
-import { Prenda, Look, Uso, getPrendas, savePrenda, deletePrenda, getLooks, saveLook, deleteLook, getUsos, registrarUso, clearAllData } from './db';
+import { 
+  Prenda, 
+  Look, 
+  Uso, 
+  getPrendas, 
+  savePrenda, 
+  deletePrenda, 
+  getLooks, 
+  saveLook, 
+  deleteLook, 
+  getUsos, 
+  registrarUso, 
+  clearAllData,
+  getCustomList,
+  saveCustomList
+} from './db';
+
+const PARTES_CUERPO = [
+  'Arriba interior',
+  'Arriba exterior',
+  'Abajo',
+  'Abrigo',
+  'Accesorios',
+  'Zapatos',
+  'Entero'
+] as const;
+
+type ParteCuerpo = typeof PARTES_CUERPO[number];
 
 const compressImage = (file: File): Promise<Blob> => {
   return new Promise((resolve, reject) => {
@@ -84,10 +112,12 @@ const base64ToBlob = (base64: string): Blob => {
 };
 
 export default function App() {
-  const [tab, setTab] = useState<'hoy' | 'armar' | 'placard' | 'agregar' | 'ajustes'>('hoy');
+  const [tab, setTab] = useState<'hoy' | 'crear' | 'armario' | 'anadir' | 'ajustes'>('hoy');
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [looks, setLooks] = useState<Look[]>([]);
   const [usos, setUsos] = useState<Uso[]>([]);
+  const [tiposCustom, setTiposCustom] = useState<string[]>([]);
+  const [ocasionesCustom, setOcasionesCustom] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [ciudad, setCiudad] = useState<string>(() => localStorage.getItem('armario_ciudad') || 'Vitoria-Gasteiz');
@@ -102,9 +132,16 @@ export default function App() {
       const p = await getPrendas();
       const l = await getLooks();
       const u = await getUsos();
+      const t = await getCustomList('tipos');
+      const o = await getCustomList('ocasiones');
       setPrendas(p);
       setLooks(l);
       setUsos(u);
+      setTiposCustom(t);
+      setOcasionesCustom(o);
+      if (!o.includes(ocasionFiltro) && o.length > 0) {
+        setOcasionFiltro(o[0]);
+      }
     } catch (e) {
       console.error('Error cargando datos', e);
     } finally {
@@ -168,7 +205,7 @@ export default function App() {
       <header className="px-5 pt-6 pb-3 border-b border-[#111111] bg-[#FAF8F5] flex justify-between items-center sticky top-0 z-30">
         <div>
           <h1 className="font-condensed text-3xl font-bold tracking-wider text-[#111111]">ARMARIO</h1>
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[#111111]/60">TECHNICAL DRESSING SYSTEM</p>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[#111111]/60">SYSTEMA VESTIDOR TÉCNICO</p>
         </div>
         <button 
           onClick={() => setTab('ajustes')}
@@ -197,15 +234,16 @@ export default function App() {
                 tempMin={tempMin} 
                 tempMax={tempMax} 
                 ocasion={ocasionFiltro}
+                ocasionesCustom={ocasionesCustom}
                 setOcasion={handleOcasionChange}
                 renderImage={renderImage}
                 onRegistrarUso={loadData}
-                onGoToAdd={() => setTab('agregar')}
+                onGoToAdd={() => setTab('anadir')}
               />
             )}
 
-            {tab === 'armar' && (
-              <TabArmar 
+            {tab === 'crear' && (
+              <TabCrear 
                 prendas={prendas} 
                 renderImage={renderImage}
                 onSaveLook={async (look) => {
@@ -216,21 +254,23 @@ export default function App() {
               />
             )}
 
-            {tab === 'placard' && (
-              <TabPlacard 
+            {tab === 'armario' && (
+              <TabArmario 
                 prendas={prendas} 
                 looks={looks}
                 renderImage={renderImage}
                 onSelectPrenda={(p) => setSelectedPrenda(p)}
-                onGoToAdd={() => setTab('agregar')}
+                onGoToAdd={() => setTab('anadir')}
               />
             )}
 
-            {tab === 'agregar' && (
-              <TabAgregar 
+            {tab === 'anadir' && (
+              <TabAnadir 
+                tiposCustom={tiposCustom}
+                ocasionesCustom={ocasionesCustom}
                 onSaved={async () => {
                   await loadData();
-                  setTab('placard');
+                  setTab('armario');
                 }}
               />
             )}
@@ -239,6 +279,8 @@ export default function App() {
               <TabAjustes 
                 prendasCount={prendas.length}
                 looksCount={looks.length}
+                tiposCustom={tiposCustom}
+                ocasionesCustom={ocasionesCustom}
                 onDataChanged={loadData}
               />
             )}
@@ -262,11 +304,12 @@ export default function App() {
         />
       )}
 
+      {/* Navigation tabs: HOY · CREAR · ARMARIO · AÑADIR */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-[420px] mx-auto bg-[#FAF8F5] border-t-2 border-[#111111] z-40 flex justify-around p-2">
         <NavButton active={tab === 'hoy'} onClick={() => setTab('hoy')} icon={<Sparkles size={20} />} label="HOY" />
-        <NavButton active={tab === 'armar'} onClick={() => setTab('armar')} icon={<Shirt size={20} />} label="ARMAR" />
-        <NavButton active={tab === 'placard'} onClick={() => setTab('placard')} icon={<Grid size={20} />} label="PLACARD" />
-        <NavButton active={tab === 'agregar'} onClick={() => setTab('agregar')} icon={<Plus size={20} />} label="AGREGAR" />
+        <NavButton active={tab === 'crear'} onClick={() => setTab('crear')} icon={<Shirt size={20} />} label="CREAR" />
+        <NavButton active={tab === 'armario'} onClick={() => setTab('armario')} icon={<Grid size={20} />} label="ARMARIO" />
+        <NavButton active={tab === 'anadir'} onClick={() => setTab('anadir')} icon={<Plus size={20} />} label="AÑADIR" />
       </nav>
     </div>
   );
@@ -293,6 +336,7 @@ function TabHoy({
   tempMin, 
   tempMax, 
   ocasion, 
+  ocasionesCustom,
   setOcasion,
   renderImage,
   onRegistrarUso,
@@ -306,12 +350,13 @@ function TabHoy({
   tempMin: number | null;
   tempMax: number | null;
   ocasion: string;
+  ocasionesCustom: string[];
   setOcasion: (o: string) => void;
   renderImage: (p: Prenda) => string | null;
   onRegistrarUso: () => void;
   onGoToAdd: () => void;
 }) {
-  const [currentLook, setCurrentLook] = useState<{ arriba?: Prenda; abajo?: Prenda; abrigo?: Prenda } | null>(null);
+  const [currentLook, setCurrentLook] = useState<{ arriba?: Prenda; abajo?: Prenda; entero?: Prenda; abrigo?: Prenda } | null>(null);
   const [lookIndex, setLookIndex] = useState(0);
 
   const getClimaActual = () => {
@@ -324,21 +369,14 @@ function TabHoy({
   const climaValido = getClimaActual();
 
   const generarSugerencias = () => {
-    const arribaOpts = prendas.filter(p => 
-      p.parte === 'Arriba' && 
+    const filtroPrenda = (p: Prenda) => 
       (p.clima.includes(climaValido) || p.clima.length === 0) &&
-      (p.ocasiones.includes(ocasion) || p.ocasiones.length === 0)
-    );
+      (p.ocasiones.includes(ocasion) || p.ocasiones.length === 0);
 
-    const abajoOpts = prendas.filter(p => 
-      p.parte === 'Abajo' && 
-      (p.clima.includes(climaValido) || p.clima.length === 0) &&
-      (p.ocasiones.includes(ocasion) || p.ocasiones.length === 0)
-    );
-
+    const arribaOpts = prendas.filter(p => (p.parte === 'Arriba interior' || p.parte === 'Arriba exterior') && filtroPrenda(p));
+    const abajoOpts = prendas.filter(p => p.parte === 'Abajo' && filtroPrenda(p));
+    const enteroOpts = prendas.filter(p => p.parte === 'Entero' && filtroPrenda(p));
     const abrigoOpts = prendas.filter(p => p.parte === 'Abrigo');
-
-    if (arribaOpts.length === 0 || abajoOpts.length === 0) return [];
 
     const ultimosTresDias = new Date();
     ultimosTresDias.setDate(ultimosTresDias.getDate() - 3);
@@ -348,24 +386,34 @@ function TabHoy({
       .filter(u => u.fecha >= fechaLimite)
       .map(u => u.lookId);
 
-    const combos: { arriba: Prenda; abajo: Prenda; abrigo?: Prenda; score: number }[] = [];
+    const combos: { arriba?: Prenda; abajo?: Prenda; entero?: Prenda; abrigo?: Prenda; score: number }[] = [];
 
+    // Separate two-piece options (Arriba + Abajo)
     for (const a of arribaOpts) {
       for (const b of abajoOpts) {
         const lookObj = looks.find(l => l.prendasIds.includes(a.id) && l.prendasIds.includes(b.id));
-        if (lookObj && recientesIds.includes(lookObj.id)) {
-          continue;
-        }
+        if (lookObj && recientesIds.includes(lookObj.id)) continue;
 
         let score = (a.vecesUsada || 0) + (b.vecesUsada || 0);
-        
         let chosenAbrigo: Prenda | undefined = undefined;
         if (tempMin !== null && tempMin < 16 && abrigoOpts.length > 0) {
           chosenAbrigo = abrigoOpts[Math.floor(Math.random() * abrigoOpts.length)];
         }
-
         combos.push({ arriba: a, abajo: b, abrigo: chosenAbrigo, score });
       }
+    }
+
+    // Entero option replaces Arriba interior + Abajo
+    for (const e of enteroOpts) {
+      const lookObj = looks.find(l => l.prendasIds.includes(e.id));
+      if (lookObj && recientesIds.includes(lookObj.id)) continue;
+
+      let score = (e.vecesUsada || 0);
+      let chosenAbrigo: Prenda | undefined = undefined;
+      if (tempMin !== null && tempMin < 16 && abrigoOpts.length > 0) {
+        chosenAbrigo = abrigoOpts[Math.floor(Math.random() * abrigoOpts.length)];
+      }
+      combos.push({ entero: e, abrigo: chosenAbrigo, score });
     }
 
     combos.sort((x, y) => x.score - y.score);
@@ -390,8 +438,9 @@ function TabHoy({
   });
 
   const tienePrendasSuficientes = 
-    prendas.some(p => p.parte === 'Arriba') && 
-    prendas.some(p => p.parte === 'Abajo');
+    prendas.some(p => p.parte === 'Entero') ||
+    (prendas.some(p => p.parte === 'Arriba interior' || p.parte === 'Arriba exterior') && 
+     prendas.some(p => p.parte === 'Abajo'));
 
   return (
     <div className="space-y-5">
@@ -431,17 +480,18 @@ function TabHoy({
         </div>
       </div>
 
+      {/* Occasions Selector */}
       <div>
         <label className="block font-mono text-[10px] uppercase tracking-wider text-[#111111]/70 mb-1">OCASIÓN</label>
-        <div className="grid grid-cols-3 gap-1 bg-[#E8E4D9] p-1 border border-[#111111]">
-          {['Trabajo', 'Salida', 'Finde'].map((oc) => (
+        <div className="flex gap-1 overflow-x-auto pb-1 bg-[#E8E4D9] p-1 border border-[#111111]">
+          {ocasionesCustom.map((oc) => (
             <button
               key={oc}
               onClick={() => {
                 setOcasion(oc);
                 setLookIndex(0);
               }}
-              className={`py-2 font-mono text-xs font-bold uppercase transition-all ${ocasion === oc ? 'bg-[#111111] text-[#F4F1EA]' : 'text-[#111111] hover:bg-black/5'}`}
+              className={`py-2 px-3 flex-1 font-mono text-xs font-bold uppercase whitespace-nowrap transition-all ${ocasion === oc ? 'bg-[#111111] text-[#F4F1EA]' : 'text-[#111111] hover:bg-black/5'}`}
             >
               {oc}
             </button>
@@ -452,12 +502,12 @@ function TabHoy({
       {!tienePrendasSuficientes ? (
         <div className="border border-dashed border-[#111111] p-8 text-center bg-[#FAF8F5] my-6">
           <p className="font-mono text-sm mb-4">TODAVÍA NO CARGASTE ROPA SUFICIENTE</p>
-          <p className="font-sans text-xs text-[#111111]/70 mb-6">Para sugerir un look necesitas al menos 1 prenda de Arriba y 1 de Abajo.</p>
+          <p className="font-sans text-xs text-[#111111]/70 mb-6">Para sugerir un look necesitas al menos un 'Entero' o una combinación de 'Arriba' y 'Abajo'.</p>
           <button 
             onClick={onGoToAdd}
             className="w-full py-3 bg-[#111111] text-[#F4F1EA] font-mono text-xs font-bold uppercase hover:bg-black/80 transition-all flex items-center justify-center gap-2"
           >
-            <Plus size={16} /> CARGAR PRIMERA PRENDA
+            <Plus size={16} /> AÑADIR PRIMERA PRENDA
           </button>
         </div>
       ) : currentLook ? (
@@ -467,14 +517,15 @@ function TabHoy({
             <span className="font-mono text-[10px] text-[#111111]/60">OPCIÓN {(lookIndex % sugerencias.length) + 1} DE {sugerencias.length}</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="border border-[#111111] bg-[#FAF8F5] p-2 corner-mark flex flex-col justify-between">
-              <span className="font-mono text-[9px] bg-[#111111]/10 px-1 py-0.5 self-start uppercase font-bold">ARRIBA</span>
-              <div className="h-36 my-2 flex items-center justify-center overflow-hidden">
-                {renderImage(currentLook.arriba!) ? (
+          {currentLook.entero ? (
+            /* Entero Single Card */
+            <div className="border border-[#111111] bg-[#FAF8F5] p-3 corner-mark flex flex-col justify-between h-64">
+              <span className="font-mono text-[9px] bg-[#111111]/10 px-1 py-0.5 self-start uppercase font-bold">PRENDA ENTERA</span>
+              <div className="h-40 my-2 flex items-center justify-center overflow-hidden">
+                {renderImage(currentLook.entero) ? (
                   <img 
-                    src={renderImage(currentLook.arriba!)!} 
-                    alt={currentLook.arriba!.nombre}
+                    src={renderImage(currentLook.entero)!} 
+                    alt={currentLook.entero.nombre}
                     className="max-h-full max-w-full object-contain mix-blend-multiply" 
                   />
                 ) : (
@@ -482,30 +533,52 @@ function TabHoy({
                 )}
               </div>
               <div>
-                <p className="font-condensed font-bold text-sm uppercase truncate">{currentLook.arriba!.nombre}</p>
-                <p className="font-mono text-[10px] text-[#111111]/60 uppercase">{currentLook.arriba!.tela}</p>
+                <p className="font-condensed font-bold text-base uppercase truncate">{currentLook.entero.nombre}</p>
+                <p className="font-mono text-[10px] text-[#111111]/60 uppercase">{currentLook.entero.tela} • {currentLook.entero.color}</p>
               </div>
             </div>
+          ) : (
+            /* Two Pieces Cards */
+            <div className="grid grid-cols-2 gap-3">
+              <div className="border border-[#111111] bg-[#FAF8F5] p-2 corner-mark flex flex-col justify-between">
+                <span className="font-mono text-[9px] bg-[#111111]/10 px-1 py-0.5 self-start uppercase font-bold">{currentLook.arriba!.parte}</span>
+                <div className="h-36 my-2 flex items-center justify-center overflow-hidden">
+                  {renderImage(currentLook.arriba!) ? (
+                    <img 
+                      src={renderImage(currentLook.arriba!)!} 
+                      alt={currentLook.arriba!.nombre}
+                      className="max-h-full max-w-full object-contain mix-blend-multiply" 
+                    />
+                  ) : (
+                    <Shirt size={48} className="text-[#111111]/20" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-condensed font-bold text-sm uppercase truncate">{currentLook.arriba!.nombre}</p>
+                  <p className="font-mono text-[10px] text-[#111111]/60 uppercase">{currentLook.arriba!.tela}</p>
+                </div>
+              </div>
 
-            <div className="border border-[#111111] bg-[#FAF8F5] p-2 corner-mark flex flex-col justify-between">
-              <span className="font-mono text-[9px] bg-[#111111]/10 px-1 py-0.5 self-start uppercase font-bold">ABAJO</span>
-              <div className="h-36 my-2 flex items-center justify-center overflow-hidden">
-                {renderImage(currentLook.abajo!) ? (
-                  <img 
-                    src={renderImage(currentLook.abajo!)!} 
-                    alt={currentLook.abajo!.nombre}
-                    className="max-h-full max-w-full object-contain mix-blend-multiply" 
-                  />
-                ) : (
-                  <Shirt size={48} className="text-[#111111]/20" />
-                )}
-              </div>
-              <div>
-                <p className="font-condensed font-bold text-sm uppercase truncate">{currentLook.abajo!.nombre}</p>
-                <p className="font-mono text-[10px] text-[#111111]/60 uppercase">{currentLook.abajo!.tela}</p>
+              <div className="border border-[#111111] bg-[#FAF8F5] p-2 corner-mark flex flex-col justify-between">
+                <span className="font-mono text-[9px] bg-[#111111]/10 px-1 py-0.5 self-start uppercase font-bold">ABAJO</span>
+                <div className="h-36 my-2 flex items-center justify-center overflow-hidden">
+                  {renderImage(currentLook.abajo!) ? (
+                    <img 
+                      src={renderImage(currentLook.abajo!)!} 
+                      alt={currentLook.abajo!.nombre}
+                      className="max-h-full max-w-full object-contain mix-blend-multiply" 
+                    />
+                  ) : (
+                    <Shirt size={48} className="text-[#111111]/20" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-condensed font-bold text-sm uppercase truncate">{currentLook.abajo!.nombre}</p>
+                  <p className="font-mono text-[10px] text-[#111111]/60 uppercase">{currentLook.abajo!.tela}</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {currentLook.abrigo && (
             <div className="border border-[#111111] bg-[#FAF8F5] p-3 flex items-center gap-3">
@@ -526,7 +599,10 @@ function TabHoy({
           <div className="border border-[#111111] p-3 bg-[#FAF8F5] font-sans text-xs leading-relaxed">
             <p className="font-bold font-mono text-[10px] text-[#111111]/60 mb-0.5">ANÁLISIS DE COMBINACIÓN:</p>
             <p>
-              {currentLook.arriba!.nombre} ({currentLook.arriba!.tela}) y {currentLook.abajo!.nombre} ({currentLook.abajo!.tela}): combinación idónea para {ocasion.toLowerCase()} con clima {climaValido.toLowerCase()}.
+              {currentLook.entero 
+                ? `${currentLook.entero.nombre} (${currentLook.entero.tela}): pieza entera ideal para ${ocasion.toLowerCase()} en clima ${climaValido.toLowerCase()}.`
+                : `${currentLook.arriba!.nombre} (${currentLook.arriba!.tela}) y ${currentLook.abajo!.nombre} (${currentLook.abajo!.tela}): combinación idónea para ${ocasion.toLowerCase()} con clima ${climaValido.toLowerCase()}.`
+              }
               {tempMin !== null && tempMin < 16 && " A la mañana hace frío: añade un abrigo para las primeras horas."}
             </p>
           </div>
@@ -541,7 +617,10 @@ function TabHoy({
 
             <button
               onClick={async () => {
-                const pIds = [currentLook.arriba!.id, currentLook.abajo!.id];
+                const pIds: string[] = [];
+                if (currentLook.entero) pIds.push(currentLook.entero.id);
+                if (currentLook.arriba) pIds.push(currentLook.arriba.id);
+                if (currentLook.abajo) pIds.push(currentLook.abajo.id);
                 if (currentLook.abrigo) pIds.push(currentLook.abrigo.id);
 
                 let lookObj = looks.find(l => 
@@ -582,7 +661,10 @@ function TabHoy({
   );
 }
 
-function TabArmar({ 
+// ----------------------------------------------------------------------
+// TAB 2: CREAR
+// ----------------------------------------------------------------------
+function TabCrear({ 
   prendas, 
   renderImage, 
   onSaveLook 
@@ -591,120 +673,191 @@ function TabArmar({
   renderImage: (p: Prenda) => string | null;
   onSaveLook: (look: Look) => Promise<void>;
 }) {
-  const arribaItems = prendas.filter(p => p.parte === 'Arriba');
+  const [modoLook, setModoLook] = useState<'dos_piezas' | 'entero'>('dos_piezas');
+
+  const arribaItems = prendas.filter(p => p.parte === 'Arriba interior' || p.parte === 'Arriba exterior');
   const abajoItems = prendas.filter(p => p.parte === 'Abajo');
+  const enteroItems = prendas.filter(p => p.parte === 'Entero');
 
   const [idxArriba, setIdxArriba] = useState(0);
   const [idxAbajo, setIdxAbajo] = useState(0);
+  const [idxEntero, setIdxEntero] = useState(0);
 
   const prendaArriba = arribaItems[idxArriba];
   const prendaAbajo = abajoItems[idxAbajo];
-
-  if (arribaItems.length === 0 || abajoItems.length === 0) {
-    return (
-      <div className="border border-dashed border-[#111111] p-8 text-center bg-[#FAF8F5] my-6">
-        <p className="font-mono text-sm mb-2">FALTAN PRENDAS</p>
-        <p className="font-sans text-xs text-[#111111]/70">Necesitas al menos 1 prenda de arriba y 1 de abajo en tu placard para armar outfits.</p>
-      </div>
-    );
-  }
+  const prendaEntero = enteroItems[idxEntero];
 
   return (
     <div className="space-y-5">
       <div className="border-b-2 border-[#111111] pb-2">
-        <h2 className="font-condensed text-xl font-bold uppercase">ESTUDIO DE MEZCLA</h2>
+        <h2 className="font-condensed text-xl font-bold uppercase">ESTUDIO DE CREACIÓN</h2>
         <p className="font-mono text-[10px] text-[#111111]/60">DESLIZA PARA COMBINAR PIEZAS</p>
       </div>
 
-      <div className="space-y-1">
-        <div className="flex justify-between items-center font-mono text-[10px] uppercase font-bold">
-          <span>PARTE SUPERIOR</span>
-          <span>{idxArriba + 1} / {arribaItems.length}</span>
-        </div>
-        <div className="border border-[#111111] bg-[#FAF8F5] p-3 corner-mark flex items-center justify-between">
-          <button 
-            onClick={() => setIdxArriba(prev => (prev > 0 ? prev - 1 : arribaItems.length - 1))}
-            className="p-2 border border-[#111111] hover:bg-black/5"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <div className="flex-1 text-center h-40 flex flex-col items-center justify-center px-2">
-            {renderImage(prendaArriba) ? (
-              <img src={renderImage(prendaArriba)!} alt={prendaArriba.nombre} className="max-h-32 object-contain mix-blend-multiply" />
-            ) : (
-              <Shirt size={48} className="text-[#111111]/20" />
-            )}
-            <p className="font-condensed font-bold text-sm uppercase mt-1">{prendaArriba.nombre}</p>
+      {/* Mode Selector */}
+      <div className="grid grid-cols-2 border border-[#111111] bg-[#E8E4D9]">
+        <button
+          onClick={() => setModoLook('dos_piezas')}
+          className={`py-2 font-mono text-xs font-bold uppercase ${modoLook === 'dos_piezas' ? 'bg-[#111111] text-[#F4F1EA]' : 'text-[#111111]'}`}
+        >
+          2 PIEZAS (ARRIBA + ABAJO)
+        </button>
+        <button
+          onClick={() => setModoLook('entero')}
+          className={`py-2 font-mono text-xs font-bold uppercase ${modoLook === 'entero' ? 'bg-[#111111] text-[#F4F1EA]' : 'text-[#111111]'}`}
+        >
+          PIEZA ENTERA
+        </button>
+      </div>
+
+      {modoLook === 'dos_piezas' ? (
+        arribaItems.length === 0 || abajoItems.length === 0 ? (
+          <div className="border border-dashed border-[#111111] p-8 text-center bg-[#FAF8F5] my-6">
+            <p className="font-mono text-sm mb-2">FALTAN PRENDAS</p>
+            <p className="font-sans text-xs text-[#111111]/70">Necesitas al menos 1 prenda de Arriba y 1 de Abajo para crear outfits de 2 piezas.</p>
           </div>
-          <button 
-            onClick={() => setIdxArriba(prev => (prev < arribaItems.length - 1 ? prev + 1 : 0))}
-            className="p-2 border border-[#111111] hover:bg-black/5"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-      </div>
+        ) : (
+          <>
+            {/* Carousel Top */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center font-mono text-[10px] uppercase font-bold">
+                <span>{prendaArriba?.parte || 'PARTE SUPERIOR'}</span>
+                <span>{idxArriba + 1} / {arribaItems.length}</span>
+              </div>
+              <div className="border border-[#111111] bg-[#FAF8F5] p-3 corner-mark flex items-center justify-between">
+                <button 
+                  onClick={() => setIdxArriba(prev => (prev > 0 ? prev - 1 : arribaItems.length - 1))}
+                  className="p-2 border border-[#111111] hover:bg-black/5"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <div className="flex-1 text-center h-36 flex flex-col items-center justify-center px-2">
+                  {renderImage(prendaArriba) ? (
+                    <img src={renderImage(prendaArriba)!} alt={prendaArriba.nombre} className="max-h-28 object-contain mix-blend-multiply" />
+                  ) : (
+                    <Shirt size={48} className="text-[#111111]/20" />
+                  )}
+                  <p className="font-condensed font-bold text-sm uppercase mt-1">{prendaArriba.nombre}</p>
+                </div>
+                <button 
+                  onClick={() => setIdxArriba(prev => (prev < arribaItems.length - 1 ? prev + 1 : 0))}
+                  className="p-2 border border-[#111111] hover:bg-black/5"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
 
-      <div className="space-y-1">
-        <div className="flex justify-between items-center font-mono text-[10px] uppercase font-bold">
-          <span>PARTE INFERIOR</span>
-          <span>{idxAbajo + 1} / {abajoItems.length}</span>
-        </div>
-        <div className="border border-[#111111] bg-[#FAF8F5] p-3 corner-mark flex items-center justify-between">
-          <button 
-            onClick={() => setIdxAbajo(prev => (prev > 0 ? prev - 1 : abajoItems.length - 1))}
-            className="p-2 border border-[#111111] hover:bg-black/5"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <div className="flex-1 text-center h-40 flex flex-col items-center justify-center px-2">
-            {renderImage(prendaAbajo) ? (
-              <img src={renderImage(prendaAbajo)!} alt={prendaAbajo.nombre} className="max-h-32 object-contain mix-blend-multiply" />
-            ) : (
-              <Shirt size={48} className="text-[#111111]/20" />
-            )}
-            <p className="font-condensed font-bold text-sm uppercase mt-1">{prendaAbajo.nombre}</p>
+            {/* Carousel Bottom */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center font-mono text-[10px] uppercase font-bold">
+                <span>PARTE INFERIOR</span>
+                <span>{idxAbajo + 1} / {abajoItems.length}</span>
+              </div>
+              <div className="border border-[#111111] bg-[#FAF8F5] p-3 corner-mark flex items-center justify-between">
+                <button 
+                  onClick={() => setIdxAbajo(prev => (prev > 0 ? prev - 1 : abajoItems.length - 1))}
+                  className="p-2 border border-[#111111] hover:bg-black/5"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <div className="flex-1 text-center h-36 flex flex-col items-center justify-center px-2">
+                  {renderImage(prendaAbajo) ? (
+                    <img src={renderImage(prendaAbajo)!} alt={prendaAbajo.nombre} className="max-h-28 object-contain mix-blend-multiply" />
+                  ) : (
+                    <Shirt size={48} className="text-[#111111]/20" />
+                  )}
+                  <p className="font-condensed font-bold text-sm uppercase mt-1">{prendaAbajo.nombre}</p>
+                </div>
+                <button 
+                  onClick={() => setIdxAbajo(prev => (prev < abajoItems.length - 1 ? prev + 1 : 0))}
+                  className="p-2 border border-[#111111] hover:bg-black/5"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                onSaveLook({
+                  id: Date.now().toString(),
+                  prendasIds: [prendaArriba.id, prendaAbajo.id],
+                  ocasion: 'Manual',
+                  nota: 'Guardado desde estudio Crear',
+                  fecha: new Date().toISOString().split('T')[0],
+                  favorito: true
+                });
+              }}
+              className="w-full py-3.5 bg-[#111111] text-[#F4F1EA] font-mono text-xs font-bold uppercase hover:bg-black/80 transition-all flex items-center justify-center gap-2 h-11"
+            >
+              <Star size={16} /> GUARDAR COMBINACIÓN COMO LOOK
+            </button>
+          </>
+        )
+      ) : (
+        enteroItems.length === 0 ? (
+          <div className="border border-dashed border-[#111111] p-8 text-center bg-[#FAF8F5] my-6">
+            <p className="font-mono text-sm mb-2">SIN PRENDAS ENTERAS</p>
+            <p className="font-sans text-xs text-[#111111]/70">No tienes registradas prendas clasificadas como 'Entero' (ej. vestidos, enteritos).</p>
           </div>
-          <button 
-            onClick={() => setIdxAbajo(prev => (prev < abajoItems.length - 1 ? prev + 1 : 0))}
-            className="p-2 border border-[#111111] hover:bg-black/5"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-      </div>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <div className="flex justify-between items-center font-mono text-[10px] uppercase font-bold">
+                <span>PRENDA ENTERA</span>
+                <span>{idxEntero + 1} / {enteroItems.length}</span>
+              </div>
+              <div className="border border-[#111111] bg-[#FAF8F5] p-3 corner-mark flex items-center justify-between">
+                <button 
+                  onClick={() => setIdxEntero(prev => (prev > 0 ? prev - 1 : enteroItems.length - 1))}
+                  className="p-2 border border-[#111111] hover:bg-black/5"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <div className="flex-1 text-center h-48 flex flex-col items-center justify-center px-2">
+                  {renderImage(prendaEntero) ? (
+                    <img src={renderImage(prendaEntero)!} alt={prendaEntero.nombre} className="max-h-36 object-contain mix-blend-multiply" />
+                  ) : (
+                    <Shirt size={48} className="text-[#111111]/20" />
+                  )}
+                  <p className="font-condensed font-bold text-sm uppercase mt-2">{prendaEntero.nombre}</p>
+                </div>
+                <button 
+                  onClick={() => setIdxEntero(prev => (prev < enteroItems.length - 1 ? prev + 1 : 0))}
+                  className="p-2 border border-[#111111] hover:bg-black/5"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
 
-      <div className="border border-[#111111] bg-[#FAF8F5] p-3 space-y-2">
-        <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
-          <span className="bg-[#111111] text-[#F4F1EA] px-2 py-0.5">{prendaArriba.tela}</span>
-          <span className="bg-[#111111] text-[#F4F1EA] px-2 py-0.5">{prendaAbajo.tela}</span>
-          <span className="border border-[#111111] px-2 py-0.5">{prendaArriba.color} + {prendaAbajo.color}</span>
-        </div>
-        <p className="font-sans text-xs text-[#111111]/80 pt-1">
-          Combinación manual registrada. Texturas complementarias de {prendaArriba.tela.toLowerCase()} y {prendaAbajo.tela.toLowerCase()}.
-        </p>
-      </div>
-
-      <button
-        onClick={() => {
-          onSaveLook({
-            id: Date.now().toString(),
-            prendasIds: [prendaArriba.id, prendaAbajo.id],
-            ocasion: 'Manual',
-            nota: 'Guardado desde estudio Armar',
-            fecha: new Date().toISOString().split('T')[0],
-            favorito: true
-          });
-        }}
-        className="w-full py-3.5 bg-[#111111] text-[#F4F1EA] font-mono text-xs font-bold uppercase hover:bg-black/80 transition-all flex items-center justify-center gap-2 h-11"
-      >
-        <Star size={16} /> GUARDAR COMBINACIÓN COMO LOOK
-      </button>
+            <button
+              onClick={() => {
+                onSaveLook({
+                  id: Date.now().toString(),
+                  prendasIds: [prendaEntero.id],
+                  ocasion: 'Manual',
+                  nota: 'Guardado desde estudio Crear (Entero)',
+                  fecha: new Date().toISOString().split('T')[0],
+                  favorito: true
+                });
+              }}
+              className="w-full py-3.5 bg-[#111111] text-[#F4F1EA] font-mono text-xs font-bold uppercase hover:bg-black/80 transition-all flex items-center justify-center gap-2 h-11"
+            >
+              <Star size={16} /> GUARDAR LOOK ENTERO
+            </button>
+          </>
+        )
+      )}
     </div>
   );
 }
 
-function TabPlacard({ 
+// ----------------------------------------------------------------------
+// TAB 3: ARMARIO
+// ----------------------------------------------------------------------
+function TabArmario({ 
   prendas, 
   looks, 
   renderImage, 
@@ -743,12 +896,12 @@ function TabPlacard({
 
       {seccion === 'prendas' ? (
         <>
-          <div className="flex gap-1 overflow-x-auto pb-1 font-mono text-[11px]">
-            {['Todo', 'Arriba', 'Abajo', 'Abrigo'].map((cat) => (
+          <div className="flex gap-1 overflow-x-auto pb-1 font-mono text-[10px]">
+            {['Todo', ...PARTES_CUERPO].map((cat) => (
               <button
                 key={cat}
                 onClick={() => setFiltroParte(cat)}
-                className={`px-3 py-1 border border-[#111111] whitespace-nowrap uppercase font-bold ${filtroParte === cat ? 'bg-[#111111] text-[#F4F1EA]' : 'bg-[#FAF8F5]'}`}
+                className={`px-2.5 py-1 border border-[#111111] whitespace-nowrap uppercase font-bold ${filtroParte === cat ? 'bg-[#111111] text-[#F4F1EA]' : 'bg-[#FAF8F5]'}`}
               >
                 {cat}
               </button>
@@ -763,7 +916,7 @@ function TabPlacard({
                 className="border border-[#111111] bg-[#FAF8F5] p-2 corner-mark cursor-pointer hover:border-black/50 flex flex-col justify-between h-48"
               >
                 <div className="flex justify-between items-center font-mono text-[9px]">
-                  <span className="bg-[#111111]/10 px-1 uppercase font-bold">{p.parte}</span>
+                  <span className="bg-[#111111]/10 px-1 uppercase font-bold truncate max-w-[90px]">{p.parte}</span>
                   <span className="text-[#111111]/60">{p.vecesUsada ? `${p.vecesUsada}x` : '0x'}</span>
                 </div>
 
@@ -789,7 +942,7 @@ function TabPlacard({
               className="border border-dashed border-[#111111] bg-transparent p-2 flex flex-col items-center justify-center h-48 cursor-pointer hover:bg-black/5 transition-all text-center"
             >
               <Plus size={32} className="mb-2 text-[#111111]" />
-              <span className="font-mono text-xs font-bold uppercase">+ AGREGAR PRENDA</span>
+              <span className="font-mono text-xs font-bold uppercase">+ AÑADIR PRENDA</span>
             </div>
           </div>
         </>
@@ -849,14 +1002,25 @@ function TabPlacard({
   );
 }
 
-function TabAgregar({ onSaved }: { onSaved: () => void }) {
+// ----------------------------------------------------------------------
+// TAB 4: AÑADIR PRENDA
+// ----------------------------------------------------------------------
+function TabAnadir({ 
+  tiposCustom, 
+  ocasionesCustom, 
+  onSaved 
+}: { 
+  tiposCustom: string[]; 
+  ocasionesCustom: string[]; 
+  onSaved: () => void; 
+}) {
   const [nombre, setNombre] = useState('');
-  const [tipo, setTipo] = useState('remera');
-  const [parte, setParte] = useState<'Arriba' | 'Abajo' | 'Entero' | 'Abrigo'>('Arriba');
+  const [tipo, setTipo] = useState(tiposCustom[0] || 'remera');
+  const [parte, setParte] = useState<ParteCuerpo>('Arriba interior');
   const [color, setColor] = useState('');
   const [tela, setTela] = useState('');
   const [clima, setClima] = useState<string[]>(['Templado']);
-  const [ocasiones, setOcasiones] = useState<string[]>(['Trabajo']);
+  const [ocasiones, setOcasiones] = useState<string[]>(ocasionesCustom.length > 0 ? [ocasionesCustom[0]] : ['Trabajo']);
   const [imageBlob, setImageBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -974,13 +1138,12 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
             <label className="block font-mono text-[10px] uppercase font-bold mb-1">PARTE DEL CUERPO</label>
             <select
               value={parte}
-              onChange={(e) => setParte(e.target.value as any)}
+              onChange={(e) => setParte(e.target.value as ParteCuerpo)}
               className="w-full p-2.5 bg-[#FAF8F5] border border-[#111111] font-mono text-xs focus:outline-none"
             >
-              <option value="Arriba">Arriba</option>
-              <option value="Abajo">Abajo</option>
-              <option value="Entero">Entero</option>
-              <option value="Abrigo">Abrigo</option>
+              {PARTES_CUERPO.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
             </select>
           </div>
 
@@ -991,14 +1154,9 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
               onChange={(e) => setTipo(e.target.value)}
               className="w-full p-2.5 bg-[#FAF8F5] border border-[#111111] font-mono text-xs focus:outline-none uppercase"
             >
-              <option value="remera">Remera</option>
-              <option value="camisa">Camisa</option>
-              <option value="blusa">Blusa</option>
-              <option value="pantalón">Pantalón</option>
-              <option value="pollera">Pollera</option>
-              <option value="vestido">Vestido</option>
-              <option value="abrigo">Abrigo</option>
-              <option value="calzado">Calzado</option>
+              {tiposCustom.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -1046,7 +1204,7 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
         <div>
           <label className="block font-mono text-[10px] uppercase font-bold mb-1">OCASIONES</label>
           <div className="grid grid-cols-2 gap-2">
-            {['Trabajo', 'Salida', 'Finde', 'Casa'].map((o) => (
+            {ocasionesCustom.map((o) => (
               <button
                 type="button"
                 key={o}
@@ -1064,22 +1222,73 @@ function TabAgregar({ onSaved }: { onSaved: () => void }) {
         type="submit"
         className="w-full py-4 bg-[#111111] text-[#F4F1EA] font-mono text-xs font-bold uppercase hover:bg-black/80 transition-all mt-4 h-12"
       >
-        GUARDAR EN EL PLACARD
+        GUARDAR EN EL ARMARIO
       </button>
     </form>
   );
 }
 
+// ----------------------------------------------------------------------
+// TAB 5: AJUSTES (AÑADIR / ELIMINAR TIPOS Y OCASIONES & BACKUP)
+// ----------------------------------------------------------------------
 function TabAjustes({ 
   prendasCount, 
   looksCount, 
+  tiposCustom,
+  ocasionesCustom,
   onDataChanged 
 }: { 
   prendasCount: number; 
   looksCount: number; 
+  tiposCustom: string[];
+  ocasionesCustom: string[];
   onDataChanged: () => void; 
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [nuevoTipo, setNuevoTipo] = useState('');
+  const [nuevaOcasion, setNuevaOcasion] = useState('');
+
+  const handleAddTipo = async () => {
+    if (!nuevoTipo.trim()) return;
+    const val = nuevoTipo.trim().toLowerCase();
+    if (!tiposCustom.includes(val)) {
+      const updated = [...tiposCustom, val];
+      await saveCustomList('tipos', updated);
+      setNuevoTipo('');
+      onDataChanged();
+    }
+  };
+
+  const handleRemoveTipo = async (val: string) => {
+    if (confirm(`¿Eliminar el tipo '${val}'?`)) {
+      const updated = tiposCustom.filter(t => t !== val);
+      await saveCustomList('tipos', updated);
+      onDataChanged();
+    }
+  };
+
+  const handleAddOcasion = async () => {
+    if (!nuevaOcasion.trim()) return;
+    const val = nuevaOcasion.trim();
+    if (!ocasionesCustom.includes(val)) {
+      const updated = [...ocasionesCustom, val];
+      await saveCustomList('ocasiones', updated);
+      setNuevaOcasion('');
+      onDataChanged();
+    }
+  };
+
+  const handleRemoveOcasion = async (val: string) => {
+    if (ocasionesCustom.length <= 1) {
+      alert('Debes mantener al menos una ocasión registrada.');
+      return;
+    }
+    if (confirm(`¿Eliminar la ocasión '${val}'?`)) {
+      const updated = ocasionesCustom.filter(o => o !== val);
+      await saveCustomList('ocasiones', updated);
+      onDataChanged();
+    }
+  };
 
   const exportBackup = async () => {
     const prendas = await getPrendas();
@@ -1087,11 +1296,13 @@ function TabAjustes({
     const usos = await getUsos();
 
     const data = {
-      version: 1,
+      version: 2,
       timestamp: new Date().toISOString(),
       prendas,
       looks,
-      usos
+      usos,
+      tiposCustom,
+      ocasionesCustom
     };
 
     const jsonString = JSON.stringify(data);
@@ -1122,6 +1333,12 @@ function TabAjustes({
           if (data.looks) {
             for (const l of data.looks) await saveLook(l);
           }
+          if (data.tiposCustom) {
+            await saveCustomList('tipos', data.tiposCustom);
+          }
+          if (data.ocasionesCustom) {
+            await saveCustomList('ocasiones', data.ocasionesCustom);
+          }
           alert('¡Copia de seguridad restaurada correctamente!');
           onDataChanged();
         }
@@ -1133,11 +1350,74 @@ function TabAjustes({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-6">
       <div className="border-b-2 border-[#111111] pb-2">
-        <h2 className="font-condensed text-xl font-bold uppercase">AJUSTES Y DATOS</h2>
+        <h2 className="font-condensed text-xl font-bold uppercase">AJUSTES Y CONFIGURACIÓN</h2>
       </div>
 
+      {/* Config: Tipos de Ropa */}
+      <div className="border border-[#111111] bg-[#FAF8F5] p-4 space-y-3 corner-mark">
+        <span className="font-mono text-xs font-bold uppercase">GESTIONAR TIPOS DE ROPA</span>
+        <p className="font-sans text-xs text-[#111111]/70">Añade o elimina clasificaciones personalizadas de tu catálogo.</p>
+        
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Nuevo tipo (ej. kimono)"
+            value={nuevoTipo}
+            onChange={(e) => setNuevoTipo(e.target.value)}
+            className="flex-1 p-2 bg-white border border-[#111111] font-sans text-xs focus:outline-none"
+          />
+          <button
+            onClick={handleAddTipo}
+            className="px-4 bg-[#111111] text-[#F4F1EA] font-mono text-xs font-bold uppercase hover:bg-black/80 flex items-center gap-1"
+          >
+            <PlusCircle size={14} /> AÑADIR
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {tiposCustom.map((t) => (
+            <span key={t} className="font-mono text-[11px] bg-white border border-[#111111] px-2 py-1 flex items-center gap-1.5 uppercase">
+              {t}
+              <button onClick={() => handleRemoveTipo(t)} className="text-red-600 font-bold hover:text-red-800">×</button>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Config: Ocasiones */}
+      <div className="border border-[#111111] bg-[#FAF8F5] p-4 space-y-3 corner-mark">
+        <span className="font-mono text-xs font-bold uppercase">GESTIONAR OCASIONES</span>
+        <p className="font-sans text-xs text-[#111111]/70">Añade eventos u ocasiones para clasificar tus looks.</p>
+        
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Nueva ocasión (ej. Gala, Deporte)"
+            value={nuevaOcasion}
+            onChange={(e) => setNuevaOcasion(e.target.value)}
+            className="flex-1 p-2 bg-white border border-[#111111] font-sans text-xs focus:outline-none"
+          />
+          <button
+            onClick={handleAddOcasion}
+            className="px-4 bg-[#111111] text-[#F4F1EA] font-mono text-xs font-bold uppercase hover:bg-black/80 flex items-center gap-1"
+          >
+            <PlusCircle size={14} /> AÑADIR
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {ocasionesCustom.map((o) => (
+            <span key={o} className="font-mono text-[11px] bg-white border border-[#111111] px-2 py-1 flex items-center gap-1.5 uppercase">
+              {o}
+              <button onClick={() => handleRemoveOcasion(o)} className="text-red-600 font-bold hover:text-red-800">×</button>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats */}
       <div className="border border-[#111111] bg-[#FAF8F5] p-4 space-y-3 corner-mark">
         <span className="font-mono text-xs font-bold uppercase">ESTADÍSTICAS DEL VESTIDOR</span>
         <div className="grid grid-cols-2 gap-2 font-mono text-xs">
@@ -1152,6 +1432,7 @@ function TabAjustes({
         </div>
       </div>
 
+      {/* Backup */}
       <div className="border border-[#111111] bg-[#FAF8F5] p-4 space-y-3 corner-mark">
         <span className="font-mono text-xs font-bold uppercase">COPIA DE SEGURIDAD (RESPALDO LOCAL)</span>
         <p className="font-sans text-xs text-[#111111]/70">
@@ -1237,19 +1518,19 @@ function ModalPrenda({
         <div className="grid grid-cols-2 gap-2 font-mono text-xs">
           <div className="border border-[#111111] p-2 bg-white">
             <span className="text-[9px] text-[#111111]/60 block">PARTE</span>
-            <span className="font-bold uppercase">{prenda.parte}</span>
+            <span className="font-bold uppercase text-[10px] truncate block">{prenda.parte}</span>
           </div>
           <div className="border border-[#111111] p-2 bg-white">
             <span className="text-[9px] text-[#111111]/60 block">TELA</span>
-            <span className="font-bold uppercase">{prenda.tela}</span>
+            <span className="font-bold uppercase text-[10px] truncate block">{prenda.tela}</span>
           </div>
           <div className="border border-[#111111] p-2 bg-white">
             <span className="text-[9px] text-[#111111]/60 block">COLOR</span>
-            <span className="font-bold uppercase">{prenda.color}</span>
+            <span className="font-bold uppercase text-[10px] truncate block">{prenda.color}</span>
           </div>
           <div className="border border-[#111111] p-2 bg-white">
             <span className="text-[9px] text-[#111111]/60 block">USOS</span>
-            <span className="font-bold uppercase">{prenda.vecesUsada || 0} VECES</span>
+            <span className="font-bold uppercase text-[10px]">{prenda.vecesUsada || 0} VECES</span>
           </div>
         </div>
 

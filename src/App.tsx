@@ -77,8 +77,8 @@ export function App() {
       await db.garments.add({
         type: formType,
         occasion: occasionString,
-        minTemp: formMinTemp,
-        maxTemp: formMaxTemp,
+        minTemp,
+        maxTemp,
         imageUrl: formImage,
         createdAt: new Date(),
       });
@@ -140,7 +140,6 @@ export function App() {
     }
   };
 
-  // Filtrado de prendas en la pestaña Armario
   const filteredGarments = garments.filter((item) => {
     const matchesType = filterType === 'TODOS' || item.type === filterType;
     const matchesOccasion = filterOccasion === 'TODAS' || item.occasion.includes(filterOccasion);
@@ -308,22 +307,4 @@ export function App() {
             </h2>
 
             {/* Selector de Imagen: Cámara o Galería */}
-            <div className="border border-dashed border-[#111111] p-4 text-center bg-white space-y-2">
-              {formImage ? (
-                <img src={formImage} alt="Vista previa" className="w-32 h-32 object-cover mx-auto border" />
-              ) : (
-                <div className="text-xs text-neutral-500">Sin foto seleccionada</div>
-              )}
-
-              <div className="flex gap-2 justify-center pt-2">
-                <label className="bg-[#111111] text-white text-xs px-3 py-2 cursor-pointer font-bold">
-                  📷 CÁMARA
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </label>
-                <label className
+            <div className="border border-dashed border-[#111111] p-

@@ -10,7 +10,7 @@ export function App() {
   // Formulario Agregar / Editar
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formType, setFormType] = useState<string>(DEFAULT_TYPES[0]);
-  const [formOccasion, setFormOccasion] = useState<string>(DEFAULT_OCCASIONS[0]);
+  const [formOccasions, setFormOccasions] = useState<string[]>([]); // Selección múltiple de ocasiones
   const [formMinTemp, setFormMinTemp] = useState<number>(10);
   const [formMaxTemp, setFormMaxTemp] = useState<number>(25);
   const [formImage, setFormImage] = useState<string>('');
@@ -51,10 +51,18 @@ export function App() {
       return;
     }
 
+    if (formOccasions.length === 0) {
+      alert('Por favor selecciona al menos una ocasión.');
+      return;
+    }
+
+    // Guardamos las ocasiones unidas por coma para mantener compatibilidad múltiple
+    const occasionString = formOccasions.join(', ');
+
     if (editingId) {
       await db.garments.update(editingId, {
         type: formType,
-        occasion: formOccasion,
+        occasion: occasionString,
         minTemp: formMinTemp,
         maxTemp: formMaxTemp,
         imageUrl: formImage,
@@ -63,7 +71,7 @@ export function App() {
     } else {
       await db.garments.add({
         type: formType,
-        occasion: formOccasion,
+        occasion: occasionString,
         minTemp: formMinTemp,
         maxTemp: formMaxTemp,
         imageUrl: formImage,
@@ -81,7 +89,7 @@ export function App() {
     if (!garment.id) return;
     setEditingId(garment.id);
     setFormType(garment.type);
-    setFormOccasion(garment.occasion);
+    setFormOccasions(garment.occasion ? garment.occasion.split(', ').map(o => o.trim()) : []);
     setFormMinTemp(garment.minTemp);
     setFormMaxTemp(garment.maxTemp);
     setFormImage(garment.imageUrl);
@@ -99,7 +107,7 @@ export function App() {
   const resetForm = () => {
     setEditingId(null);
     setFormType(types[0] || DEFAULT_TYPES[0]);
-    setFormOccasion(occasions[0] || DEFAULT_OCCASIONS[0]);
+    setFormOccasions([DEFAULT_OCCASIONS[0]]);
     setFormMinTemp(10);
     setFormMaxTemp(25);
     setFormImage('');
@@ -165,7 +173,7 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: CREAR (Con carruseles en orden estricto) */}
+        {/* TAB: CREAR (Carruseles en orden estricto) */}
         {activeTab === 'crear' && (
           <div className="space-y-6">
             <h2 className="text-sm font-bold tracking-wider uppercase border-b border-[#111111] pb-1">
@@ -246,7 +254,7 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: AGREGAR (Añadir / Editar Prenda con soporte de Galería) */}
+        {/* TAB: AGREGAR (Añadir / Editar con Selección Múltiple) */}
         {activeTab === 'agregar' && (
           <form onSubmit={handleSaveGarment} className="space-y-4">
             <h2 className="text-sm font-bold uppercase tracking-wider border-b border-[#111111] pb-1">
@@ -297,17 +305,31 @@ export function App() {
               </select>
             </div>
 
+            {/* Ocasión (Selección múltiple mediante checkboxes / botones de selección) */}
             <div>
-              <label className="block text-xs font-bold uppercase mb-1">Ocasión</label>
-              <select
-                value={formOccasion}
-                onChange={(e) => setFormOccasion(e.target.value)}
-                className="w-full border border-[#111111] p-2 bg-white text-xs font-mono"
-              >
-                {occasions.map((o) => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
+              <label className="block text-xs font-bold uppercase mb-1">Ocasiones (Selección múltiple)</label>
+              <div className="grid grid-cols-2 gap-2 border border-[#111111] p-2 bg-white">
+                {occasions.map((occ) => {
+                  const isChecked = formOccasions.includes(occ);
+                  return (
+                    <label key={occ} className="flex items-center space-x-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormOccasions([...formOccasions, occ]);
+                          } else {
+                            setFormOccasions(formOccasions.filter(o => o !== occ));
+                          }
+                        }}
+                        className="accent-black"
+                      />
+                      <span className="uppercase font-bold">{occ}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -336,7 +358,7 @@ export function App() {
                 type="submit"
                 className="flex-1 bg-[#111111] text-white py-3 text-xs font-bold tracking-widest uppercase hover:bg-neutral-800"
               >
-                {editingId ? 'GUARDAR CAMBIOS' : 'GUARDAR PRENDA'}
+                {editingId ? 'GUARDAR CAMBIOS' : 'AÑADIR AL ARMARIO'}
               </button>
               {editingId && (
                 <button
@@ -355,7 +377,7 @@ export function App() {
         )}
       </main>
 
-      {/* Navigation Bar restaurada con los nombres originales */}
+      {/* Navigation Bar */}
       <nav className="fixed bottom-0 max-w-md w-full bg-[#111111] text-white flex justify-around py-3 border-t border-[#111111]">
         <button
           onClick={() => setActiveTab('hoy')}

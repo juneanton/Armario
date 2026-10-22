@@ -1,211 +1,45 @@
-// IndexedDB implementation with dynamic options (Tipos and Ocasiones)
-const DB_NAME = 'ArmarioDB';
-const DB_VERSION = 2;
+import Dexie, { Table } from 'dexie';
 
-export interface Prenda {
-  id: string;
-  fotoBlob?: Blob;
-  fotoBase64?: string;
-  nombre: string;
-  tipo: string;
-  parte: 'Arriba interior' | 'Arriba exterior' | 'Abajo' | 'Abrigo' | 'Accesorios' | 'Zapatos' | 'Entero';
-  color: string;
-  tela: string;
-  clima: string[];
-  ocasiones: string[];
-  vecesUsada: number;
-  ultimoUso?: string;
-  fechaAlta: string;
-}
-
-export interface Look {
-  id: string;
-  prendasIds: string[];
-  ocasion: string;
-  nota: string;
-  fecha: string;
-  favorito: boolean;
-}
-
-export interface Uso {
+export interface Garment {
   id?: number;
-  fecha: string;
-  lookId: string;
-  prendasIds: string[];
+  type: string;       // Ej: 'Arriba interior', 'Zapatos', 'Accesorios', etc.
+  occasion: string;   // Ej: 'TRABAJO', 'SALIDA', 'FINDE'
+  minTemp: number;
+  maxTemp: number;
+  imageUrl: string;
+  createdAt: Date;
 }
 
-export interface ConfigOp {
-  key: 'tipos' | 'ocasiones';
+export interface CustomConfig {
+  id?: number;
+  key: string;        // 'types' o 'occasions'
   values: string[];
 }
 
-const DEFAULT_TIPOS = ['remera', 'camisa', 'blusa', 'pantalón', 'pollera', 'vestido', 'abrigo', 'calzado', 'accesorio', 'top', 'campera', 'suéter'];
-const DEFAULT_OCASIONES = ['Trabajo', 'Salida', 'Finde', 'Casa'];
+export class ArmarioDatabase extends Dexie {
+  garments!: Table<Garment>;
+  configs!: Table<CustomConfig>;
 
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains('prendas')) {
-        db.createObjectStore('prendas', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('looks')) {
-        db.createObjectStore('looks', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('usos')) {
-        db.createObjectStore('usos', { keyPath: 'id', autoIncrement: true });
-      }
-      if (!db.objectStoreNames.contains('config')) {
-        db.createObjectStore('config', { keyPath: 'key' });
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function getPrendas(): Promise<Prenda[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('prendas', 'readonly');
-    const store = tx.objectStore('prendas');
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function savePrenda(prenda: Prenda): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('prendas', 'readwrite');
-    const store = tx.objectStore('prendas');
-    const req = store.put(prenda);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function deletePrenda(id: string): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('prendas', 'readwrite');
-    const store = tx.objectStore('prendas');
-    const req = store.delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function getLooks(): Promise<Look[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('looks', 'readonly');
-    const store = tx.objectStore('looks');
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function saveLook(look: Look): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('looks', 'readwrite');
-    const store = tx.objectStore('looks');
-    const req = store.put(look);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function deleteLook(id: string): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('looks', 'readwrite');
-    const store = tx.objectStore('looks');
-    const req = store.delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function getUsos(): Promise<Uso[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('usos', 'readonly');
-    const store = tx.objectStore('usos');
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function registrarUso(lookId: string, prendasIds: string[]): Promise<void> {
-  const db = await openDB();
-  const fechaHoy = new Date().toISOString().split('T')[0];
-  
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction('usos', 'readwrite');
-    const store = tx.objectStore('usos');
-    const req = store.add({ fecha: fechaHoy, lookId, prendasIds });
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-
-  const prendas = await getPrendas();
-  for (const pId of prendasIds) {
-    const p = prendas.find(item => item.id === pId);
-    if (p) {
-      p.vecesUsada = (p.vecesUsada || 0) + 1;
-      p.ultimoUso = fechaHoy;
-      await savePrenda(p);
-    }
-  }
-}
-
-// Config Tipos & Ocasiones
-export async function getCustomList(key: 'tipos' | 'ocasiones'): Promise<string[]> {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction('config', 'readonly');
-    const store = tx.objectStore('config');
-    const req = store.get(key);
-    req.onsuccess = () => {
-      if (req.result && req.result.values) {
-        resolve(req.result.values);
-      } else {
-        resolve(key === 'tipos' ? DEFAULT_TIPOS : DEFAULT_OCASIONES);
-      }
-    };
-    req.onerror = () => resolve(key === 'tipos' ? DEFAULT_TIPOS : DEFAULT_OCASIONES);
-  });
-}
-
-export async function saveCustomList(key: 'tipos' | 'ocasiones', values: string[]): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('config', 'readwrite');
-    const store = tx.objectStore('config');
-    const req = store.put({ key, values });
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function clearAllData(): Promise<void> {
-  const db = await openDB();
-  const stores = ['prendas', 'looks', 'usos', 'config'];
-  for (const s of stores) {
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(s, 'readwrite');
-      const store = tx.objectStore(s);
-      const req = store.clear();
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+  constructor() {
+    super('ArmarioPWA');
+    this.version(1).stores({
+      garments: '++id, type, occasion, minTemp, maxTemp',
+      configs: '++id, key'
     });
   }
 }
+
+export const db = new ArmarioDatabase();
+
+// Tipos por defecto en el orden estricto solicitado
+export const DEFAULT_TYPES = [
+  'Arriba exterior',
+  'Arriba interior',
+  'Abajo',
+  'Zapatos',
+  'Abrigo',
+  'Accesorios',
+  'Entero'
+];
+
+export const DEFAULT_OCCASIONS = ['TRABAJO', 'SALIDA', 'FINDE'];

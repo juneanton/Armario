@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { db, Garment, DEFAULT_TYPES, DEFAULT_OCCASIONS } from './db';
-import { Sun, Sparkles, Shirt, PlusCircle, Trash2, Edit, Settings, X, Plus, Download, Upload, RefreshCw } from 'lucide-react';
+import { db, Garment, Look, Uso, DEFAULT_TYPES, DEFAULT_OCCASIONS } from './db';
+import { Sun, Sparkles, Shirt, PlusCircle, Trash2, Edit, Settings, X, Plus, Download, Upload, RefreshCw, Heart, CheckCircle } from 'lucide-react';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'hoy' | 'crear' | 'armario' | 'añadir'>('hoy');
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const [garments, setGarments] = useState<Garment[]>([]);
+  const [looks, setLooks] = useState<Look[]>([]);
+  const [usos, setUsos] = useState<Uso[]>([]);
   const [types, setTypes] = useState<string[]>(DEFAULT_TYPES);
   const [occasions, setOccasions] = useState<string[]>(DEFAULT_OCCASIONS);
 
-  // Estados para añadir nuevos Tipos/Ocasiones en Ajustes
+  // Estados para Ajustes
   const [newTypeInput, setNewTypeInput] = useState<string>('');
   const [newOccasionInput, setNewOccasionInput] = useState<string>('');
+  const [lookNameInput, setLookNameInput] = useState<string>('');
 
-  // Filtros para la pestaña ARMARIO
+  // Filtros en ARMARIO
   const [filterType, setFilterType] = useState<string>('TODOS');
   const [filterOccasion, setFilterOccasion] = useState<string>('TODAS');
 
@@ -36,6 +39,12 @@ export function App() {
     const allGarments = await db.garments.toArray();
     setGarments(allGarments);
 
+    const allLooks = await db.looks.toArray();
+    setLooks(allLooks);
+
+    const allUsos = await db.usos.toArray();
+    setUsos(allUsos);
+
     const savedTypes = await db.configs.get({ key: 'types' });
     if (savedTypes && savedTypes.values.length > 0) {
       setTypes(savedTypes.values);
@@ -51,13 +60,59 @@ export function App() {
     }
   };
 
-  // Exportar datos a un archivo JSON
+  // Guardar Look Favorito
+  const handleSaveLook = async () => {
+    const itemsArray = Object.values(selectedOutfit);
+    if (itemsArray.length === 0) {
+      alert('Selecciona al menos una prenda para crear el look.');
+      return;
+    }
+    const name = lookNameInput.trim() || `Look ${new Date().toLocaleDateString()}`;
+
+    await db.looks.add({
+      name,
+      items: itemsArray,
+      createdAt: new Date(),
+    });
+
+    alert(`¡Look "${name}" guardado en favoritos!`);
+    setLookNameInput('');
+    setSelectedOutfit({});
+    loadData();
+  };
+
+  // Registrar uso de un look
+  const handleWearLook = async (look: Look) => {
+    if (!look.id) return;
+    const today = new Date().toISOString().slice(0, 10);
+    await db.usos.add({
+      lookId: look.id,
+      lookName: look.name,
+      date: today,
+    });
+    alert(`¡Registrado! Hoy te has puesto: ${look.name}`);
+    loadData();
+  };
+
+  const handleDeleteLook = async (id?: number) => {
+    if (!id) return;
+    if (confirm('¿Eliminar este look guardado?')) {
+      await db.looks.delete(id);
+      loadData();
+    }
+  };
+
+  // Exportar / Importar JSON
   const handleExportData = async () => {
     const allGarments = await db.garments.toArray();
+    const allLooks = await db.looks.toArray();
+    const allUsos = await db.usos.toArray();
     const allConfigs = await db.configs.toArray();
 
     const dataToExport = {
       garments: allGarments,
+      looks: allLooks,
+      usos: allUsos,
       configs: allConfigs,
       exportedAt: new Date().toISOString(),
     };
@@ -71,7 +126,6 @@ export function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Importar datos desde un archivo JSON
   const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -82,38 +136,46 @@ export function App() {
         const content = event.target?.result as string;
         const parsedData = JSON.parse(content);
 
-        if (parsedData.garments && Array.isArray(parsedData.garments)) {
+        if (parsedData.garments) {
           await db.garments.clear();
           await db.garments.bulkAdd(parsedData.garments);
         }
-
-        if (parsedData.configs && Array.isArray(parsedData.configs)) {
+        if (parsedData.looks) {
+          await db.looks.clear();
+          await db.looks.bulkAdd(parsedData.looks);
+        }
+        if (parsedData.usos) {
+          await db.usos.clear();
+          await db.usos.bulkAdd(parsedData.usos);
+        }
+        if (parsedData.configs) {
           await db.configs.clear();
           await db.configs.bulkAdd(parsedData.configs);
         }
 
-        alert('¡Datos importados con éxito!');
+        alert('¡Datos, looks y categorías importados con éxito!');
         loadData();
         setShowSettings(false);
       } catch (err) {
-        alert('Error al leer el archivo JSON. Verifica que sea un respaldo válido.');
+        alert('Error al leer el archivo JSON.');
       }
     };
     reader.readAsText(file);
   };
 
-  // Restablecer/Limpiar la base de datos
   const handleResetData = async () => {
-    if (confirm('¿Estás seguro de que deseas borrar TODAS las prendas y datos del armario? Esta acción no se puede deshacer.')) {
+    if (confirm('¿Borrar TODO (prendas, looks y ajustes)? No se puede deshacer.')) {
       await db.garments.clear();
+      await db.looks.clear();
+      await db.usos.clear();
       await db.configs.clear();
-      alert('Se han borrado todos los datos.');
+      alert('Sistema restablecido.');
       loadData();
       setShowSettings(false);
     }
   };
 
-  // Funciones de Ajustes (Añadir / Eliminar Tipos u Ocasiones)
+  // Gestión de Tipos (Añadir / Eliminar Categorías)
   const handleAddType = async () => {
     if (!newTypeInput.trim()) return;
     const updatedTypes = [...types, newTypeInput.trim()];
@@ -129,11 +191,17 @@ export function App() {
   };
 
   const handleDeleteType = async (typeToDelete: string) => {
-    const updatedTypes = types.filter(t => t !== typeToDelete);
-    setTypes(updatedTypes);
-    const existing = await db.configs.get({ key: 'types' });
-    if (existing && existing.id) {
-      await db.configs.update(existing.id, { values: updatedTypes });
+    if (DEFAULT_TYPES.includes(typeToDelete)) {
+      alert('No se pueden eliminar las categorías principales del sistema.');
+      return;
+    }
+    if (confirm(`¿Eliminar la categoría "${typeToDelete}"?`)) {
+      const updatedTypes = types.filter(t => t !== typeToDelete);
+      setTypes(updatedTypes);
+      const existing = await db.configs.get({ key: 'types' });
+      if (existing && existing.id) {
+        await db.configs.update(existing.id, { values: updatedTypes });
+      }
     }
   };
 
@@ -271,7 +339,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#111111] font-mono max-w-md mx-auto border-x border-[#111111]">
-      {/* Header con Botón de Ajustes */}
+      {/* Header con Ajustes */}
       <header className="p-4 border-b border-[#111111] bg-[#FAF8F5] flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-black tracking-tighter">ARMARIO</h1>
@@ -279,7 +347,7 @@ export function App() {
         </div>
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="p-2 border border-[#111111] bg-white hover:bg-neutral-100 transition-colors"
+          className="p-2 border border-[#111111] bg-white hover:bg-neutral-100"
           title="Ajustes"
         >
           <Settings className="w-5 h-5" />
@@ -292,41 +360,32 @@ export function App() {
           <div className="bg-[#FAF8F5] border-2 border-[#111111] p-4 w-full max-w-md max-h-[85vh] overflow-y-auto space-y-6">
             <div className="flex justify-between items-center border-b border-[#111111] pb-2">
               <h2 className="text-sm font-black uppercase tracking-wider">CONFIGURACIÓN DEL SISTEMA</h2>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="p-1 border border-[#111111] hover:bg-red-50"
-              >
+              <button onClick={() => setShowSettings(false)} className="p-1 border border-[#111111] hover:bg-red-50">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Gestión de Tipos */}
+            {/* Gestión de Tipos / Categorías (con opción de eliminar) */}
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase">Categorías / Tipos de Prenda</h3>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Nuevo tipo..."
+                  placeholder="Nueva categoría..."
                   value={newTypeInput}
                   onChange={(e) => setNewTypeInput(e.target.value)}
                   className="flex-1 border border-[#111111] p-1 text-xs font-mono bg-white"
                 />
-                <button
-                  onClick={handleAddType}
-                  className="bg-[#111111] text-white px-3 py-1 text-xs font-bold flex items-center gap-1"
-                >
+                <button onClick={handleAddType} className="bg-[#111111] text-white px-3 py-1 text-xs font-bold flex items-center gap-1">
                   <Plus className="w-3 h-3" /> AÑADIR
                 </button>
               </div>
               <div className="flex flex-wrap gap-1 pt-1">
                 {types.map((t) => (
-                  <span
-                    key={t}
-                    className="border border-[#111111] bg-white text-[10px] font-bold px-2 py-1 flex items-center gap-1"
-                  >
+                  <span key={t} className="border border-[#111111] bg-white text-[10px] font-bold px-2 py-1 flex items-center gap-1">
                     {t}
                     {!DEFAULT_TYPES.includes(t) && (
-                      <button onClick={() => handleDeleteType(t)} className="text-red-600 font-black ml-1">×</button>
+                      <button onClick={() => handleDeleteType(t)} className="text-red-600 font-black ml-1 cursor-pointer">×</button>
                     )}
                   </span>
                 ))}
@@ -344,64 +403,44 @@ export function App() {
                   onChange={(e) => setNewOccasionInput(e.target.value)}
                   className="flex-1 border border-[#111111] p-1 text-xs font-mono bg-white uppercase"
                 />
-                <button
-                  onClick={handleAddOccasion}
-                  className="bg-[#111111] text-white px-3 py-1 text-xs font-bold flex items-center gap-1"
-                >
+                <button onClick={handleAddOccasion} className="bg-[#111111] text-white px-3 py-1 text-xs font-bold flex items-center gap-1">
                   <Plus className="w-3 h-3" /> AÑADIR
                 </button>
               </div>
               <div className="flex flex-wrap gap-1 pt-1">
                 {occasions.map((o) => (
-                  <span
-                    key={o}
-                    className="border border-[#111111] bg-white text-[10px] font-bold px-2 py-1 flex items-center gap-1"
-                  >
+                  <span key={o} className="border border-[#111111] bg-white text-[10px] font-bold px-2 py-1 flex items-center gap-1">
                     {o}
                     {!DEFAULT_OCCASIONS.includes(o) && (
-                      <button onClick={() => handleDeleteOccasion(o)} className="text-red-600 font-black ml-1">×</button>
+                      <button onClick={() => handleDeleteOccasion(o)} className="text-red-600 font-black ml-1 cursor-pointer">×</button>
                     )}
                   </span>
                 ))}
               </div>
             </div>
 
-            {/* Copia de Seguridad e Importación/Exportación JSON */}
+            {/* Copia de Seguridad JSON */}
             <div className="border-t border-[#111111] pt-4 space-y-3">
               <h3 className="text-xs font-bold uppercase">Copia de Seguridad (JSON)</h3>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleExportData}
-                  className="border border-[#111111] bg-white text-xs font-bold p-2 flex items-center justify-center gap-1 hover:bg-neutral-100"
-                >
+                <button onClick={handleExportData} className="border border-[#111111] bg-white text-xs font-bold p-2 flex items-center justify-center gap-1 hover:bg-neutral-100">
                   <Download className="w-3 h-3" /> EXPORTAR JSON
                 </button>
                 <label className="border border-[#111111] bg-white text-xs font-bold p-2 flex items-center justify-center gap-1 cursor-pointer hover:bg-neutral-100">
                   <Upload className="w-3 h-3" /> IMPORTAR JSON
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportData}
-                    className="hidden"
-                  />
+                  <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
                 </label>
               </div>
             </div>
 
-            {/* Reset / Limpieza de datos */}
+            {/* Restablecer sistema */}
             <div className="border-t border-[#111111] pt-4">
-              <button
-                onClick={handleResetData}
-                className="w-full border border-red-600 text-red-600 bg-red-50 p-2 text-xs font-bold uppercase flex items-center justify-center gap-1 hover:bg-red-100"
-              >
+              <button onClick={handleResetData} className="w-full border border-red-600 text-red-600 bg-red-50 p-2 text-xs font-bold uppercase flex items-center justify-center gap-1 hover:bg-red-100">
                 <RefreshCw className="w-3 h-3" /> RESTABLECER TODO
               </button>
             </div>
 
-            <button
-              onClick={() => setShowSettings(false)}
-              className="w-full bg-[#111111] text-white py-2 text-xs font-bold uppercase tracking-widest mt-4"
-            >
+            <button onClick={() => setShowSettings(false)} className="w-full bg-[#111111] text-white py-2 text-xs font-bold uppercase tracking-widest mt-4">
               CERRAR Y GUARDAR
             </button>
           </div>
@@ -419,20 +458,25 @@ export function App() {
               <div className="text-2xl font-black mt-2">18°C <span className="text-xs font-normal">TEMPLADO</span></div>
             </div>
 
-            <div className="border border-[#111111] p-4 text-center bg-[#FAF8F5]">
-              <p className="text-sm font-bold uppercase">Sugerencia Automática</p>
-              {garments.length < 2 ? (
-                <div className="py-6 text-xs text-neutral-600">
-                  Añade más prendas a tu armario para generar looks automáticos.
-                </div>
+            <div className="border border-[#111111] p-4 bg-[#FAF8F5] space-y-3">
+              <p className="text-sm font-bold uppercase">Historial de Usos Recientes</p>
+              {usos.length === 0 ? (
+                <p className="text-xs text-neutral-500 italic">No hay registros de uso todavía.</p>
               ) : (
-                <p className="text-xs mt-2">Cargando combinación sugerida...</p>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {usos.slice().reverse().map((u) => (
+                    <div key={u.id} className="bg-white border border-[#111111] p-2 text-xs flex justify-between items-center">
+                      <span className="font-bold">{u.lookName}</span>
+                      <span className="text-[10px] text-neutral-500">{u.date}</span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
         )}
 
-        {/* TAB: CREAR */}
+        {/* TAB: CREAR (Carruseles deslizables con guardar favorito) */}
         {activeTab === 'crear' && (
           <div className="space-y-6">
             <h2 className="text-sm font-bold tracking-wider uppercase border-b border-[#111111] pb-1">
@@ -449,7 +493,8 @@ export function App() {
                     {typeCategory} ({items.length})
                   </span>
 
-                  <div className="flex gap-3 overflow-x-auto pb-2">
+                  {/* Carrusel deslizable con scroll horizontal fluido */}
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
                     {items.map((garment) => {
                       const isSelected = selectedOutfit[typeCategory]?.id === garment.id;
                       return (
@@ -475,6 +520,62 @@ export function App() {
                 </div>
               );
             })}
+
+            {/* Guardar Look Actual */}
+            {Object.keys(selectedOutfit).length > 0 && (
+              <div className="border border-[#111111] p-3 bg-white space-y-2">
+                <h3 className="text-xs font-bold uppercase">Guardar Look Seleccionado</h3>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nombre del look (ej. Look Oficina)..."
+                    value={lookNameInput}
+                    onChange={(e) => setLookNameInput(e.target.value)}
+                    className="flex-1 border border-[#111111] p-1 text-xs font-mono"
+                  />
+                  <button onClick={handleSaveLook} className="bg-[#111111] text-white px-3 py-1 text-xs font-bold flex items-center gap-1">
+                    <Heart className="w-3 h-3" /> GUARDAR
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Listado de Looks Favoritos Guardados */}
+            <div className="border border-[#111111] p-3 bg-white space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider">Mis Looks Favoritos ({looks.length})</h3>
+              {looks.length === 0 ? (
+                <p className="text-xs text-neutral-500 italic">No tienes looks guardados aún.</p>
+              ) : (
+                <div className="space-y-3">
+                  {looks.map((look) => (
+                    <div key={look.id} className="border border-[#111111] p-2 bg-[#FAF8F5] space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold uppercase">{look.name}</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleWearLook(look)}
+                            className="bg-[#111111] text-white text-[10px] px-2 py-1 font-bold flex items-center gap-1 hover:bg-neutral-800"
+                          >
+                            <CheckCircle className="w-3 h-3" /> ME LO HE PUESTO
+                          </button>
+                          <button
+                            onClick={() => handleDeleteLook(look.id)}
+                            className="border border-[#111111] text-red-600 px-2 py-1 text-[10px] font-bold hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {look.items.map((item, idx) => (
+                          <img key={idx} src={item.imageUrl} alt={item.type} className="w-12 h-12 object-cover border border-neutral-300 flex-shrink-0" />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -485,7 +586,7 @@ export function App() {
               <h2 className="text-sm font-bold uppercase tracking-wider">MI ARMARIO ({filteredGarments.length})</h2>
             </div>
 
-            {/* Filtros de prendas */}
+            {/* Filtros */}
             <div className="grid grid-cols-2 gap-2 bg-white p-2 border border-[#111111]">
               <div>
                 <label className="block text-[10px] font-bold uppercase mb-1">Filtrar por Tipo</label>
@@ -516,7 +617,7 @@ export function App() {
               </div>
             </div>
 
-            {/* Listado de prendas filtradas */}
+            {/* Listado */}
             <div className="grid grid-cols-2 gap-3">
               {filteredGarments.length === 0 ? (
                 <div className="col-span-2 text-center py-8 text-xs text-neutral-500 italic">
@@ -539,7 +640,7 @@ export function App() {
                       </button>
                       <button
                         onClick={() => handleDeleteClick(item.id)}
-                        className="px-2 border border-[#111111] text-[10px] font-bold hover:bg-red-50"
+                        className="px-2 border border-[#111111] text-[10px] font-bold hover:bg-red-50 flex items-center justify-center"
                       >
                         <Trash2 className="w-3 h-3 text-red-600" />
                       </button>
@@ -558,7 +659,6 @@ export function App() {
               {editingId ? 'EDITAR PRENDA' : 'AÑADIR NUEVA PRENDA'}
             </h2>
 
-            {/* Selector de Imagen: Cámara o Galería */}
             <div className="border border-dashed border-[#111111] p-4 text-center bg-white space-y-2">
               {formImage ? (
                 <img src={formImage} alt="Vista previa" className="w-32 h-32 object-cover mx-auto border" />
@@ -569,22 +669,11 @@ export function App() {
               <div className="flex gap-2 justify-center pt-2">
                 <label className="bg-[#111111] text-white text-xs px-3 py-2 cursor-pointer font-bold">
                   📷 CÁMARA
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
+                  <input type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
                 </label>
                 <label className="border border-[#111111] bg-white text-xs px-3 py-2 cursor-pointer font-bold">
                   🖼️ GALERÍA
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 </label>
               </div>
             </div>
@@ -602,7 +691,6 @@ export function App() {
               </select>
             </div>
 
-            {/* Ocasiones (Selección múltiple) */}
             <div>
               <label className="block text-xs font-bold uppercase mb-1">Ocasiones (Selección múltiple)</label>
               <div className="grid grid-cols-2 gap-2 border border-[#111111] p-2 bg-white">
@@ -629,7 +717,6 @@ export function App() {
               </div>
             </div>
 
-            {/* Clima / Tiempo (Selección múltiple) */}
             <div>
               <label className="block text-xs font-bold uppercase mb-1">Clima (Selección múltiple)</label>
               <div className="grid grid-cols-3 gap-2 border border-[#111111] p-2 bg-white">
@@ -680,7 +767,7 @@ export function App() {
         )}
       </main>
 
-      {/* Navigation Bar con Iconos y Nombres */}
+      {/* Navigation Bar */}
       <nav className="fixed bottom-0 max-w-md w-full bg-[#111111] text-white flex justify-around py-2 border-t border-[#111111]">
         <button
           onClick={() => setActiveTab('hoy')}

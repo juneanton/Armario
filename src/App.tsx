@@ -175,7 +175,7 @@ export function App() {
     }
   };
 
-  // Gestión de Tipos (Añadir / Eliminar Categorías)
+  // Añadir nuevo Tipo / Categoría
   const handleAddType = async () => {
     if (!newTypeInput.trim()) return;
     const updatedTypes = [...types, newTypeInput.trim()];
@@ -190,21 +190,22 @@ export function App() {
     setNewTypeInput('');
   };
 
+  // ELIMINAR CUALQUIER TIPO DE PRENDA (Sin restricciones)
   const handleDeleteType = async (typeToDelete: string) => {
-    if (DEFAULT_TYPES.includes(typeToDelete)) {
-      alert('No se pueden eliminar las categorías principales del sistema.');
-      return;
-    }
     if (confirm(`¿Eliminar la categoría "${typeToDelete}"?`)) {
       const updatedTypes = types.filter(t => t !== typeToDelete);
       setTypes(updatedTypes);
+
       const existing = await db.configs.get({ key: 'types' });
       if (existing && existing.id) {
         await db.configs.update(existing.id, { values: updatedTypes });
+      } else {
+        await db.configs.add({ key: 'types', values: updatedTypes });
       }
     }
   };
 
+  // Añadir Ocasión
   const handleAddOccasion = async () => {
     if (!newOccasionInput.trim()) return;
     const updatedOccasions = [...occasions, newOccasionInput.trim().toUpperCase()];
@@ -219,12 +220,18 @@ export function App() {
     setNewOccasionInput('');
   };
 
+  // ELIMINAR CUALQUIER OCASIÓN
   const handleDeleteOccasion = async (occToDelete: string) => {
-    const updatedOccasions = occasions.filter(o => o !== occToDelete);
-    setOccasions(updatedOccasions);
-    const existing = await db.configs.get({ key: 'occasions' });
-    if (existing && existing.id) {
-      await db.configs.update(existing.id, { values: updatedOccasions });
+    if (confirm(`¿Eliminar la ocasión "${occToDelete}"?`)) {
+      const updatedOccasions = occasions.filter(o => o !== occToDelete);
+      setOccasions(updatedOccasions);
+
+      const existing = await db.configs.get({ key: 'occasions' });
+      if (existing && existing.id) {
+        await db.configs.update(existing.id, { values: updatedOccasions });
+      } else {
+        await db.configs.add({ key: 'occasions', values: updatedOccasions });
+      }
     }
   };
 
@@ -306,31 +313,6 @@ export function App() {
     setFormImage('');
   };
 
-  const desiredOrder = ['Arriba exterior', 'Arriba interior', 'Abajo', 'Zapatos', 'Abrigo', 'Accesorios', 'Entero'];
-  const orderedTypes = Array.from(new Set([...desiredOrder, ...types]));
-
-  const handleSelectGarment = (typeCategory: string, garment: Garment) => {
-    if (typeCategory === 'Entero') {
-      setSelectedOutfit((prev) => ({
-        ...prev,
-        'Entero': garment,
-        'Arriba interior': garment,
-        'Abajo': garment,
-      }));
-    } else if (typeCategory === 'Arriba interior' || typeCategory === 'Abajo') {
-      setSelectedOutfit((prev) => {
-        const copy = { ...prev, [typeCategory]: garment };
-        delete copy['Entero'];
-        return copy;
-      });
-    } else {
-      setSelectedOutfit((prev) => ({
-        ...prev,
-        [typeCategory]: garment,
-      }));
-    }
-  };
-
   const filteredGarments = garments.filter((item) => {
     const matchesType = filterType === 'TODOS' || item.type === filterType;
     const matchesOccasion = filterOccasion === 'TODAS' || item.occasion.includes(filterOccasion);
@@ -339,11 +321,18 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#111111] font-mono max-w-md mx-auto border-x border-[#111111]">
-      {/* Header con Ajustes */}
+      {/* Header con Logo y Ajustes */}
       <header className="p-4 border-b border-[#111111] bg-[#FAF8F5] flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-black tracking-tighter">ARMARIO</h1>
-          <p className="text-xs tracking-widest text-neutral-500">TECHNICAL DRESSING SYSTEM</p>
+        <div className="flex items-center gap-3">
+          <img 
+            src="/logo-armario.png" 
+            alt="Logo Armario" 
+            className="w-10 h-10 object-contain border border-[#111111] bg-black" 
+          />
+          <div>
+            <h1 className="text-xl font-black tracking-tighter">ARMARIO</h1>
+            <p className="text-[10px] tracking-widest text-neutral-500">TECHNICAL DRESSING SYSTEM</p>
+          </div>
         </div>
         <button
           onClick={() => setShowSettings(!showSettings)}
@@ -365,7 +354,7 @@ export function App() {
               </button>
             </div>
 
-            {/* Gestión de Tipos / Categorías (con opción de eliminar) */}
+            {/* Gestión de Tipos / Categorías (con botón de eliminar para todas) */}
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase">Categorías / Tipos de Prenda</h3>
               <div className="flex gap-2">
@@ -384,9 +373,7 @@ export function App() {
                 {types.map((t) => (
                   <span key={t} className="border border-[#111111] bg-white text-[10px] font-bold px-2 py-1 flex items-center gap-1">
                     {t}
-                    {!DEFAULT_TYPES.includes(t) && (
-                      <button onClick={() => handleDeleteType(t)} className="text-red-600 font-black ml-1 cursor-pointer">×</button>
-                    )}
+                    <button onClick={() => handleDeleteType(t)} className="text-red-600 font-black ml-1 cursor-pointer">×</button>
                   </span>
                 ))}
               </div>
@@ -411,9 +398,7 @@ export function App() {
                 {occasions.map((o) => (
                   <span key={o} className="border border-[#111111] bg-white text-[10px] font-bold px-2 py-1 flex items-center gap-1">
                     {o}
-                    {!DEFAULT_OCCASIONS.includes(o) && (
-                      <button onClick={() => handleDeleteOccasion(o)} className="text-red-600 font-black ml-1 cursor-pointer">×</button>
-                    )}
+                    <button onClick={() => handleDeleteOccasion(o)} className="text-red-600 font-black ml-1 cursor-pointer">×</button>
                   </span>
                 ))}
               </div>
@@ -476,14 +461,14 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: CREAR (Carruseles deslizables con guardar favorito) */}
+        {/* TAB: CREAR */}
         {activeTab === 'crear' && (
           <div className="space-y-6">
             <h2 className="text-sm font-bold tracking-wider uppercase border-b border-[#111111] pb-1">
               CREAR LOOK INTERACTIVO
             </h2>
 
-            {orderedTypes.map((typeCategory) => {
+            {types.map((typeCategory) => {
               const items = garments.filter((g) => g.type === typeCategory);
               if (items.length === 0) return null;
 
@@ -493,7 +478,6 @@ export function App() {
                     {typeCategory} ({items.length})
                   </span>
 
-                  {/* Carrusel deslizable con scroll horizontal fluido */}
                   <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
                     {items.map((garment) => {
                       const isSelected = selectedOutfit[typeCategory]?.id === garment.id;
@@ -521,14 +505,14 @@ export function App() {
               );
             })}
 
-            {/* Guardar Look Actual */}
+            {/* Guardar Look */}
             {Object.keys(selectedOutfit).length > 0 && (
               <div className="border border-[#111111] p-3 bg-white space-y-2">
                 <h3 className="text-xs font-bold uppercase">Guardar Look Seleccionado</h3>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Nombre del look (ej. Look Oficina)..."
+                    placeholder="Nombre del look..."
                     value={lookNameInput}
                     onChange={(e) => setLookNameInput(e.target.value)}
                     className="flex-1 border border-[#111111] p-1 text-xs font-mono"
@@ -540,7 +524,7 @@ export function App() {
               </div>
             )}
 
-            {/* Listado de Looks Favoritos Guardados */}
+            {/* Looks Favoritos */}
             <div className="border border-[#111111] p-3 bg-white space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider">Mis Looks Favoritos ({looks.length})</h3>
               {looks.length === 0 ? (
@@ -579,14 +563,13 @@ export function App() {
           </div>
         )}
 
-        {/* TAB: ARMARIO CON FILTROS */}
+        {/* TAB: ARMARIO */}
         {activeTab === 'armario' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center border-b border-[#111111] pb-1">
               <h2 className="text-sm font-bold uppercase tracking-wider">MI ARMARIO ({filteredGarments.length})</h2>
             </div>
 
-            {/* Filtros */}
             <div className="grid grid-cols-2 gap-2 bg-white p-2 border border-[#111111]">
               <div>
                 <label className="block text-[10px] font-bold uppercase mb-1">Filtrar por Tipo</label>
@@ -596,7 +579,7 @@ export function App() {
                   className="w-full border border-[#111111] p-1 text-[11px] font-mono bg-[#FAF8F5]"
                 >
                   <option value="TODOS">TODOS LOS TIPOS</option>
-                  {orderedTypes.map((t) => (
+                  {types.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -617,7 +600,6 @@ export function App() {
               </div>
             </div>
 
-            {/* Listado */}
             <div className="grid grid-cols-2 gap-3">
               {filteredGarments.length === 0 ? (
                 <div className="col-span-2 text-center py-8 text-xs text-neutral-500 italic">
@@ -685,7 +667,7 @@ export function App() {
                 onChange={(e) => setFormType(e.target.value)}
                 className="w-full border border-[#111111] p-2 bg-white text-xs font-mono"
               >
-                {orderedTypes.map((t) => (
+                {types.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>

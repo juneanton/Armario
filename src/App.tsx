@@ -60,6 +60,29 @@ export function App() {
     }
   };
 
+  // Función encargada de seleccionar las prendas en la pestaña CREAR
+  const handleSelectGarment = (typeCategory: string, garment: Garment) => {
+    if (typeCategory === 'Entero') {
+      setSelectedOutfit((prev) => ({
+        ...prev,
+        'Entero': garment,
+        'Arriba interior': garment,
+        'Abajo': garment,
+      }));
+    } else if (typeCategory === 'Arriba interior' || typeCategory === 'Abajo') {
+      setSelectedOutfit((prev) => {
+        const copy = { ...prev, [typeCategory]: garment };
+        delete copy['Entero'];
+        return copy;
+      });
+    } else {
+      setSelectedOutfit((prev) => ({
+        ...prev,
+        [typeCategory]: garment,
+      }));
+    }
+  };
+
   // Guardar Look Favorito
   const handleSaveLook = async () => {
     const itemsArray = Object.values(selectedOutfit);
@@ -190,7 +213,7 @@ export function App() {
     setNewTypeInput('');
   };
 
-  // ELIMINAR CUALQUIER TIPO DE PRENDA (Sin restricciones)
+  // Eliminar categoría
   const handleDeleteType = async (typeToDelete: string) => {
     if (confirm(`¿Eliminar la categoría "${typeToDelete}"?`)) {
       const updatedTypes = types.filter(t => t !== typeToDelete);
@@ -220,7 +243,7 @@ export function App() {
     setNewOccasionInput('');
   };
 
-  // ELIMINAR CUALQUIER OCASIÓN
+  // Eliminar Ocasión
   const handleDeleteOccasion = async (occToDelete: string) => {
     if (confirm(`¿Eliminar la ocasión "${occToDelete}"?`)) {
       const updatedOccasions = occasions.filter(o => o !== occToDelete);
@@ -354,7 +377,7 @@ export function App() {
               </button>
             </div>
 
-            {/* Gestión de Tipos / Categorías (con botón de eliminar para todas) */}
+            {/* Gestión de Tipos / Categorías */}
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase">Categorías / Tipos de Prenda</h3>
               <div className="flex gap-2">

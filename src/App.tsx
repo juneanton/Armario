@@ -60,7 +60,6 @@ export function App() {
     }
   };
 
-  // Función encargada de seleccionar las prendas en la pestaña CREAR
   const handleSelectGarment = (typeCategory: string, garment: Garment) => {
     if (typeCategory === 'Entero') {
       setSelectedOutfit((prev) => ({
@@ -83,7 +82,6 @@ export function App() {
     }
   };
 
-  // Guardar Look Favorito
   const handleSaveLook = async () => {
     const itemsArray = Object.values(selectedOutfit);
     if (itemsArray.length === 0) {
@@ -104,7 +102,6 @@ export function App() {
     loadData();
   };
 
-  // Registrar uso de un look
   const handleWearLook = async (look: Look) => {
     if (!look.id) return;
     const today = new Date().toISOString().slice(0, 10);
@@ -113,7 +110,7 @@ export function App() {
       lookName: look.name,
       date: today,
     });
-    alert(`¡Registrado! Hoy te has puesto: ${look.name}`);
+    alert(`¡Registrado! Hoy te has puesto: ${look.name}. Queda registrado para evitar repeticiones recientes.`);
     loadData();
   };
 
@@ -125,7 +122,6 @@ export function App() {
     }
   };
 
-  // Exportar / Importar JSON
   const handleExportData = async () => {
     const allGarments = await db.garments.toArray();
     const allLooks = await db.looks.toArray();
@@ -198,7 +194,6 @@ export function App() {
     }
   };
 
-  // Añadir nuevo Tipo / Categoría
   const handleAddType = async () => {
     if (!newTypeInput.trim()) return;
     const updatedTypes = [...types, newTypeInput.trim()];
@@ -213,7 +208,6 @@ export function App() {
     setNewTypeInput('');
   };
 
-  // Eliminar categoría
   const handleDeleteType = async (typeToDelete: string) => {
     if (confirm(`¿Eliminar la categoría "${typeToDelete}"?`)) {
       const updatedTypes = types.filter(t => t !== typeToDelete);
@@ -228,7 +222,6 @@ export function App() {
     }
   };
 
-  // Añadir Ocasión
   const handleAddOccasion = async () => {
     if (!newOccasionInput.trim()) return;
     const updatedOccasions = [...occasions, newOccasionInput.trim().toUpperCase()];
@@ -243,7 +236,6 @@ export function App() {
     setNewOccasionInput('');
   };
 
-  // Eliminar Ocasión
   const handleDeleteOccasion = async (occToDelete: string) => {
     if (confirm(`¿Eliminar la ocasión "${occToDelete}"?`)) {
       const updatedOccasions = occasions.filter(o => o !== occToDelete);
@@ -344,18 +336,11 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#F4F1EA] text-[#111111] font-mono max-w-md mx-auto border-x border-[#111111]">
-      {/* Header con Logo y Ajustes */}
+      {/* Header sin logo visible (estilo minimalista original) */}
       <header className="p-4 border-b border-[#111111] bg-[#FAF8F5] flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <img 
-            src="/logo-armario.png" 
-            alt="Logo Armario" 
-            className="w-10 h-10 object-contain border border-[#111111] bg-black" 
-          />
-          <div>
-            <h1 className="text-xl font-black tracking-tighter">ARMARIO</h1>
-            <p className="text-[10px] tracking-widest text-neutral-500">TECHNICAL DRESSING SYSTEM</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-black tracking-tighter">ARMARIO</h1>
+          <p className="text-xs tracking-widest text-neutral-500">TECHNICAL DRESSING SYSTEM</p>
         </div>
         <button
           onClick={() => setShowSettings(!showSettings)}
@@ -562,6 +547,7 @@ export function App() {
                           <button
                             onClick={() => handleWearLook(look)}
                             className="bg-[#111111] text-white text-[10px] px-2 py-1 font-bold flex items-center gap-1 hover:bg-neutral-800"
+                            title="Indicar que te lo has puesto hoy"
                           >
                             <CheckCircle className="w-3 h-3" /> ME LO HE PUESTO
                           </button>
